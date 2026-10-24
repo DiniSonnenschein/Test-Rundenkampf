@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createBattle, currentUnit, endTurn, grantExtraTurn, knockOut, moveUnit, placeUnit, placementArea,
-  placementSnapshot, revive, startBattle, useActionSlot, visible, type BattleMap,
+  createBattle, currentUnit, endTurn, grantExtraTurn, moveUnit, placeUnit, placementArea,
+  placementSnapshot, removeUnit, setUnconscious, startBattle, useActionSlot, visible, type BattleMap, type BattleState,
 } from './battle';
+import { recordTurn, undoTurns } from './history';
 import { distance, hasLineOfSight, neighbors, posKey, reachable, type Grid } from './grid';
 import { initiativeOrder } from './initiative';
 import { litTiles } from './light';
 import { DEFAULT_RULES, normalizeRules, type Rules } from './rules';
+
+const rulesWith = (defeat: Partial<Rules['defeat']>) => normalizeRules({ defeat: { ...DEFAULT_RULES.defeat, ...defeat } });
 
 function grid(w: number, h: number, walls: string[] = []): Grid {
   const set = new Set(walls);
@@ -44,14 +47,14 @@ describe('Raster', () => {
 });
 
 describe('Licht', () => {
-  const light = DEFAULT_RULES.light;
-  it('Laterne beleuchtet einen Kreis, Wände werfen Schatten', () => {
-    const lit = litTiles(grid(9, 9, ['5,4']), [{ pos: { x: 4, y: 4 }, radius: 3 }], light);
-    expect(lit.has('4,4') && lit.has('7,4') === false && lit.has('5,4')).toBe(true);
+  it('Laterne beleuchtet einen Kreis, schattenwerfende Felder blockieren', () => {
+    const lit = litTiles(grid(9, 9, ['5,4']), [{ pos: { x: 4, y: 4 }, radius: 3 }], 'kreis');
+    expect(lit.has('4,4')).toBe(true);
+    expect(lit.has('5,4')).toBe(true);
+    expect(lit.has('7,4')).toBe(false);
     expect(lit.has('4,7')).toBe(true);
     expect(lit.has('7,7')).toBe(false);
-    const noShadow = litTiles(grid(9, 9, ['5,4']), [{ pos: { x: 4, y: 4 }, radius: 3 }], { ...light, blockedBySight: false });
-    expect(noShadow.has('7,4')).toBe(true);
+    expect(litTiles(grid(9, 9), [{ pos: { x: 4, y: 4 }, radius: 3 }], 'quadrat').has('7,7')).toBe(true);
   });
 });
 
@@ -112,9 +115,18 @@ describe('Kampfablauf', () => {
     expect(setup(DEFAULT_RULES, snap).units[1].pos).toEqual({ x: 1, y: 3 });
   });
 
-  it('Nebel: ohne Licht ist (fast) nichts sichtbar', () => {
+  it('Nebel: ohne Licht ist (fast) nichts sichtbar; Eigensicht je Charakter', () => {
     const s = setup();
     expect(visible(s).has('9,0')).toBe(false);
+    expect(visible(s).has('2,4')).toBe(true);
+    const far = moveUnit(startBattle(s), 'ritter', { x: 9, y: 8 });
+    expect(visible(far).has('9,7')).toBe(false);
+    const seeing = { ...far, units: far.units.map((u) => (u.id === 'ritter' ? { ...u, sight: 1 } : u)) };
+    expect(visible(seeing).has('9,7')).toBe(true);
+  });
+
+  it('die Laterne brennt auch, wenn der Träger bewusstlos ist', () => {
+    const s = setUnconscious(startBattle(setup()), 'laterne', true);
     expect(visible(s).has('2,4')).toBe(true);
   });
 
@@ -144,44 +156,78 @@ describe('Kampfablauf', () => {
     expect(s.queue).toHaveLength(5);
   });
 
-  it('Sieg, sobald alle Allys auf Siegfeldern stehen', () => {
+  it('Sieg erst, wenn alle Allys (auch bewusstlose) auf Siegfeldern stehen', () => {
     let s = startBattle(setup());
     s = moveUnit(s, 'laterne', { x: 9, y: 9 });
     expect(s.phase).toBe('kampf');
+    s = moveUnit(s, 'laterne', { x: 7, y: 9 }); // Siegfelder dürfen wieder verlassen werden
     s = moveUnit(s, 'ritter', { x: 8, y: 9 });
-    expect(s.phase).toBe('sieg');
-  });
-
-  it('bewusstlose Allys zählen (einstellbar) nicht für den Sieg', () => {
-    let s = startBattle(setup());
-    s = knockOut(s, 'ritter');
-    expect(s.units[1].status).toBe('bewusstlos');
+    s = setUnconscious(s, 'ritter', true);
+    expect(s.phase).toBe('kampf');
     s = moveUnit(s, 'laterne', { x: 9, y: 9 });
     expect(s.phase).toBe('sieg');
+  });
 
-    const strict = normalizeRules({ ko: { unconsciousExcludedFromVictory: false } });
-    let t = knockOut(startBattle(setup(strict)), 'ritter');
-    t = moveUnit(t, 'laterne', { x: 9, y: 9 });
+  it('Run verloren nach X verpassten Zügen in Bewusstlosigkeit (auch Laternenträger)', () => {
+    let s = startBattle(setup(rulesWith({ unconsciousTurns: 2 })));
+    s = setUnconscious(s, 'laterne', true); // war am Zug → Zug endet sofort
+    expect(currentUnit(s)?.id).toBe('ritter');
+    s = endTurn(endTurn(s)); // Runde 2: Laterne verpasst 1. Zug
+    expect(s.units[0].missedTurns).toBe(1);
+    expect(s.phase).toBe('kampf');
+    s = endTurn(endTurn(s)); // Runde 3: 2. verpasster Zug
+    expect(s.phase).toBe('niederlage');
+    expect(s.outcome).toContain('Laterne');
+  });
+
+  it('Aufwecken setzt den Zähler zurück; 0 = aus', () => {
+    let s = startBattle(setup(rulesWith({ unconsciousTurns: 2 })));
+    s = setUnconscious(s, 'laterne', true);
+    s = endTurn(endTurn(s));
+    s = setUnconscious(s, 'laterne', false);
+    expect(s.units[0].missedTurns).toBe(0);
+
+    let t = setUnconscious(startBattle(setup(rulesWith({ unconsciousTurns: 0 }))), 'ritter', true);
+    for (let i = 0; i < 10; i++) t = endTurn(t);
     expect(t.phase).toBe('kampf');
-    t = revive(t, 'ritter');
-    expect(t.units[1].status).toBe('aktiv');
   });
 
-  it('Niederlage, wenn kein Ally mehr steht oder (einstellbar) die Laterne fällt', () => {
-    let s = knockOut(knockOut(startBattle(setup()), 'ritter'), 'laterne');
+  it('Run verloren bei zu vielen gleichzeitig Bewusstlosen', () => {
+    let s = setUnconscious(startBattle(setup(rulesWith({ unconsciousCount: 1 }))), 'ritter', true);
     expect(s.phase).toBe('niederlage');
-    s = knockOut(startBattle(setup(normalizeRules({ ko: { defeatOnLanternLoss: true } }))), 'laterne');
+    s = setUnconscious(startBattle(setup()), 'ritter', true);
+    expect(s.phase).toBe('kampf');
+    s = setUnconscious(s, 'laterne', true);
     expect(s.phase).toBe('niederlage');
   });
 
-  it('K.O. des aktiven Charakters beendet seinen Zug; Gegner verschwinden', () => {
-    let s = startBattle(setup());
-    s = knockOut(s, 'laterne');
-    expect(currentUnit(s)?.id).toBe('ritter');
-    s = knockOut(s, 'goblin');
-    expect(s.units[2].status).toBe('tot');
-    s = endTurn(s);
+  it('entfernte Gegner verlieren ihre Züge', () => {
+    let s = removeUnit(startBattle(setup()), 'goblin');
+    s = endTurn(endTurn(s));
     expect(s.round).toBe(2);
-    expect(currentUnit(s)?.id).toBe('ritter');
+    expect(currentUnit(s)?.id).toBe('laterne');
+  });
+});
+
+describe('Züge rückgängig', () => {
+  it('springt an den Beginn früherer Züge zurück', () => {
+    const map: BattleMap = { width: 5, height: 5, blocked: [], opaque: [], victory: [], lanternStart: { x: 0, y: 0 } };
+    let s = startBattle(createBattle({
+      rules: DEFAULT_RULES, map,
+      allies: [{ id: 'a', name: 'A', pos: null, lantern: {}, actionSlots: [] }],
+      enemies: [{ id: 'g', name: 'G', pos: { x: 4, y: 4 }, actionSlots: [] }],
+    }));
+    let h: BattleState[] = recordTurn([], s);
+    s = moveUnit(s, 'a', { x: 1, y: 1 });
+    h = recordTurn(h, s);
+    expect(h).toHaveLength(1);
+    s = endTurn(s); h = recordTurn(h, s);
+    s = endTurn(s); h = recordTurn(h, s);
+    expect(h).toHaveLength(3);
+    const back = undoTurns(h, 3)!;
+    expect(back.state.round).toBe(1);
+    expect(back.state.units[0].pos).toEqual({ x: 0, y: 0 });
+    expect(back.history).toHaveLength(1);
+    expect(undoTurns(h, 99)!.state).toBe(h[0]);
   });
 });

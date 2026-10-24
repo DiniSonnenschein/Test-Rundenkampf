@@ -2,11 +2,12 @@
 // Der Zustand ist reines JSON (für Spielstände); alle Funktionen liefern einen neuen Zustand.
 import { inBounds, posKey, samePos, type Grid, type Pos } from './grid';
 import { initiativeOrder } from './initiative';
-import { visibleTiles, type LightSource } from './light';
+import { litTiles, visibleTiles, type LightSource } from './light';
 import type { Rules } from './rules';
 
 export type Side = 'ally' | 'enemy';
-export type UnitStatus = 'aktiv' | 'bewusstlos' | 'tot';
+/** bewusstlos = fester Effekt (Abschnitt 4); entfernt = z. B. geflohener Gegner. Niemand stirbt. */
+export type UnitStatus = 'aktiv' | 'bewusstlos' | 'entfernt';
 export type Phase = 'platzierung' | 'kampf' | 'sieg' | 'niederlage';
 
 export interface Unit {
@@ -15,8 +16,12 @@ export interface Unit {
   name: string;
   pos: Pos | null;
   status: UnitStatus;
-  /** Laternenträger: steht fest auf dem Laternen-Startfeld. */
+  /** Laternenträger: steht fest auf dem Laternen-Startfeld; die Laterne brennt auch, wenn er bewusstlos ist. */
   lantern?: { radius?: number };
+  /** Eigensicht ohne Licht (Radius, 0 = nur eigenes Feld). */
+  sight?: number;
+  /** Am Stück bewusstlos verpasste eigene Züge. */
+  missedTurns?: number;
   /** Abweichende Anzahl Züge pro Runde. */
   turnsPerRound?: number;
   /** Aktionsplätze eines Zuges; jeder Platz bietet eine Auswahl an Fähigkeiten (IDs). */
@@ -30,7 +35,7 @@ export interface BattleMap {
   height: number;
   /** Nicht begehbare Felder (posKey). */
   blocked: string[];
-  /** Sichtblockierende Felder (posKey). */
+  /** Sichtblockierende (schattenwerfende) Felder (posKey). */
   opaque: string[];
   victory: Pos[];
   lanternStart: Pos;
@@ -52,6 +57,8 @@ export interface BattleState {
   queue: string[];
   turn: Turn | null;
   explored: string[];
+  /** Grund für Sieg/Niederlage. */
+  outcome?: string;
 }
 
 /** Platzierung relativ zum Laternenträger, um sie ins nächste Level zu übernehmen. */
@@ -75,18 +82,20 @@ export function gridOf(map: BattleMap): Grid {
 export const getUnit = (s: BattleState, id: string) => s.units.find((u) => u.id === id);
 export const lanternBearer = (s: BattleState) => s.units.find((u) => u.side === 'ally' && u.lantern);
 export const unitAt = (s: BattleState, p: Pos) =>
-  s.units.find((u) => u.pos && samePos(u.pos, p) && u.status !== 'tot');
+  s.units.find((u) => u.pos && samePos(u.pos, p) && u.status !== 'entfernt');
 
 function lightSources(s: BattleState): LightSource[] {
   return s.units
-    .filter((u) => u.lantern && u.pos && u.status === 'aktiv')
+    .filter((u) => u.lantern && u.pos && u.status !== 'entfernt')
     .map((u) => ({ pos: u.pos!, radius: u.lantern!.radius ?? s.rules.light.lanternRadius }));
 }
 
-/** Aktuell sichtbare Felder. */
+/** Aktuell sichtbare Felder: Licht + Eigensicht wacher Allys. */
 export function visible(s: BattleState): Set<string> {
-  const viewers = s.units.filter((u) => u.side === 'ally' && u.status === 'aktiv' && u.pos).map((u) => u.pos!);
-  return visibleTiles(gridOf(s.map), lightSources(s), viewers, s.rules.light);
+  const viewers = s.units
+    .filter((u) => u.side === 'ally' && u.status === 'aktiv' && u.pos)
+    .map((u) => ({ pos: u.pos!, radius: u.sight ?? 0 }));
+  return visibleTiles(gridOf(s.map), lightSources(s), viewers, s.rules.light.shape);
 }
 
 function withExplored(s: BattleState): BattleState {
@@ -105,7 +114,7 @@ function updateUnit(s: BattleState, id: string, patch: Partial<Unit>): BattleSta
 /** Felder, auf denen Allys platziert werden dürfen: beleuchtet und begehbar. */
 export function placementArea(s: BattleState): Pos[] {
   const g = gridOf(s.map);
-  const lit = visible({ ...s, units: s.units.filter((u) => u.lantern) });
+  const lit = litTiles(g, lightSources(s), s.rules.light.shape);
   return [...lit]
     .map((k) => {
       const [x, y] = k.split(',').map(Number);
@@ -178,20 +187,34 @@ export function placementSnapshot(s: BattleState): Placement {
 // ---------- Runden & Züge ----------
 
 function roundQueue(s: BattleState): string[] {
-  const active = s.order.filter((id) => getUnit(s, id)?.status === 'aktiv');
+  // Bewusstlose bleiben in der Reihenfolge, damit ihre verpassten Züge gezählt werden.
+  const present = s.order.filter((id) => getUnit(s, id)?.status !== 'entfernt');
   const turns = (id: string) => getUnit(s, id)?.turnsPerRound ?? s.rules.turnsPerRound;
-  const max = Math.max(0, ...active.map(turns));
+  const max = Math.max(0, ...present.map(turns));
   const queue: string[] = [];
-  for (let pass = 0; pass < max; pass++) queue.push(...active.filter((id) => turns(id) > pass));
+  for (let pass = 0; pass < max; pass++) queue.push(...present.filter((id) => turns(id) > pass));
   return queue;
 }
 
+/** Nächster Zug; Bewusstlose verpassen ihren Zug (wird gezählt). */
 function beginTurn(s: BattleState): BattleState {
-  let queue = s.queue.filter((id) => getUnit(s, id)?.status === 'aktiv');
+  let queue = s.queue.filter((id) => getUnit(s, id)?.status !== 'entfernt');
   let round = s.round;
-  if (queue.length === 0) {
-    round++;
-    queue = roundQueue(s);
+  for (let guard = 0; guard < 1000; guard++) {
+    if (queue.length === 0) {
+      round++;
+      queue = roundQueue(s);
+      if (queue.length === 0) break;
+    }
+    const unit = getUnit(s, queue[0])!;
+    if (unit.status === 'aktiv') break;
+    const missed = (unit.missedTurns ?? 0) + 1;
+    s = updateUnit(s, unit.id, { missedTurns: missed });
+    const limit = s.rules.defeat.unconsciousTurns;
+    if (unit.side === 'ally' && limit > 0 && missed >= limit) {
+      return { ...s, round, queue, phase: 'niederlage', turn: null, outcome: `${unit.name} war ${missed} Züge bewusstlos.` };
+    }
+    queue = queue.slice(1);
   }
   return { ...s, round, queue, turn: queue.length ? { unitId: queue[0], usedSlots: [] } : null };
 }
@@ -235,35 +258,42 @@ export function moveUnit(s: BattleState, id: string, pos: Pos): BattleState {
   return checkOutcome(withExplored(updateUnit(s, id, { pos })));
 }
 
-// ---------- K.O., Sieg & Niederlage ----------
+// ---------- Bewusstlosigkeit, Sieg & Niederlage ----------
 
-export function knockOut(s: BattleState, id: string): BattleState {
+/** Bewusstlos setzen oder aufwecken (ausgelöst durch den festen Effekt „Bewusstlos“). */
+export function setUnconscious(s: BattleState, id: string, unconscious: boolean): BattleState {
   const unit = getUnit(s, id);
-  if (!unit || unit.status !== 'aktiv') return s;
-  const mode = unit.side === 'ally' ? s.rules.ko.allies : s.rules.ko.enemies;
-  s = updateUnit(s, id, { status: mode });
+  if (!unit || unit.status === 'entfernt') return s;
+  if (unconscious === (unit.status === 'bewusstlos')) return s;
+  s = updateUnit(s, id, { status: unconscious ? 'bewusstlos' : 'aktiv', missedTurns: 0 });
+  if (unconscious && s.turn?.unitId === id) {
+    s = checkOutcome(s);
+    if (s.phase === 'kampf') s = beginTurn({ ...s, queue: s.queue.slice(1) });
+  }
+  return checkOutcome(withExplored(s));
+}
+
+/** Nimmt eine Figur aus dem Kampf (z. B. geflohener Gegner). */
+export function removeUnit(s: BattleState, id: string): BattleState {
+  const unit = getUnit(s, id);
+  if (!unit || unit.status === 'entfernt') return s;
+  s = updateUnit(s, id, { status: 'entfernt', pos: null });
   if (s.turn?.unitId === id) s = beginTurn({ ...s, queue: s.queue.slice(1) });
   return checkOutcome(s);
 }
 
-export function revive(s: BattleState, id: string): BattleState {
-  const unit = getUnit(s, id);
-  if (!unit || unit.status !== 'bewusstlos') return s;
-  return checkOutcome(updateUnit(s, id, { status: 'aktiv' }));
-}
-
 export function checkOutcome(s: BattleState): BattleState {
   if (s.phase !== 'kampf') return s;
-  const allies = s.units.filter((u) => u.side === 'ally');
-  const active = allies.filter((u) => u.status === 'aktiv');
-  const bearer = lanternBearer(s);
-  if (active.length === 0 || (s.rules.ko.defeatOnLanternLoss && bearer && bearer.status !== 'aktiv')) {
-    return { ...s, phase: 'niederlage', turn: null };
+  const allies = s.units.filter((u) => u.side === 'ally' && u.status !== 'entfernt');
+  const unconscious = allies.filter((u) => u.status === 'bewusstlos').length;
+  const limit = s.rules.defeat.unconsciousCount === 'alle' ? allies.length : s.rules.defeat.unconsciousCount;
+  if (unconscious > 0 && (unconscious >= limit || unconscious === allies.length)) {
+    return { ...s, phase: 'niederlage', turn: null, outcome: `${unconscious} Allys sind bewusstlos.` };
   }
-  const mustReach = allies.filter(
-    (u) => u.status === 'aktiv' || (u.status === 'bewusstlos' && !s.rules.ko.unconsciousExcludedFromVictory),
-  );
+  // Siegfelder sind bis dahin gewöhnliche Felder; keiner wird zurückgelassen.
   const onVictory = (u: Unit) => !!u.pos && s.map.victory.some((v) => samePos(v, u.pos!));
-  if (mustReach.every(onVictory)) return { ...s, phase: 'sieg', turn: null };
+  if (allies.length > 0 && allies.every(onVictory)) {
+    return { ...s, phase: 'sieg', turn: null, outcome: 'Alle Allys haben ein Siegfeld erreicht.' };
+  }
   return s;
 }

@@ -1,10 +1,10 @@
 // Regelwerk: alle einstellbaren Grundregeln eines Kampfes.
 // Fest (nicht einstellbar) sind: quadratisches Raster, Nebel & Laterne, Platzierung vor dem Kampf,
-// feste Initiative-Reihenfolge, Züge aus Aktionen und Sieg durch Erreichen der Siegfelder.
+// feste Initiative-Reihenfolge, Züge aus Aktionen und Sieg, sobald alle Allys auf Siegfeldern stehen.
+// Niemand stirbt: „Bewusstlos“ ist ein fester Effekt; zu lange oder zu viele Bewusstlose → Run verloren (Flucht).
 
 export type LightShape = 'kreis' | 'quadrat';
 export type TieBreak = 'allys-zuerst' | 'gegner-zuerst' | 'abwechselnd';
-export type KoMode = 'bewusstlos' | 'tot';
 
 export interface InitiativeCriterion {
   /** Ressource/Wert, der in die Initiative einfließt (ab Abschnitt 3). */
@@ -18,13 +18,9 @@ export interface Rules {
   /** Diagonal an Hindernis-Ecken vorbei bewegen erlaubt. */
   cornerCutting: boolean;
   light: {
-    /** Standard-Radius der Laterne (kann je Ally später abweichen). */
+    /** Standard-Radius der Laterne. */
     lanternRadius: number;
     shape: LightShape;
-    /** Sichtblockierende Felder werfen Schatten. */
-    blockedBySight: boolean;
-    /** Wie weit jeder Ally ohne Licht sieht (0 = nur das eigene Feld). */
-    ownSight: number;
     /** Einmal gesehene Felder bleiben (ohne Figuren) aufgedeckt. */
     rememberExplored: boolean;
   };
@@ -35,41 +31,43 @@ export interface Rules {
   };
   /** Reguläre Züge pro Charakter und Runde. */
   turnsPerRound: number;
-  ko: {
-    /** Ressource, bei deren Erreichen von 0 ein Charakter K.O. geht (z. B. LP). */
-    resourceId: string | null;
-    allies: KoMode;
-    enemies: KoMode;
-    /** Bewusstlose Allys müssen für den Sieg kein Siegfeld erreichen. */
-    unconsciousExcludedFromVictory: boolean;
-    /** Niederlage, wenn der Laternenträger K.O. geht. */
-    defeatOnLanternLoss: boolean;
+  defeat: {
+    /** Run verloren, wenn ein Ally so viele eigene Züge am Stück bewusstlos verpasst (0 = aus). */
+    unconsciousTurns: number;
+    /** Run verloren, sobald so viele Allys gleichzeitig bewusstlos sind ('alle' = das ganze Team). */
+    unconsciousCount: number | 'alle';
   };
 }
 
 export const DEFAULT_RULES: Rules = {
   diagonal: true,
   cornerCutting: false,
-  light: { lanternRadius: 3, shape: 'kreis', blockedBySight: true, ownSight: 0, rememberExplored: true },
+  light: { lanternRadius: 3, shape: 'kreis', rememberExplored: true },
   initiative: { criteria: [], tieBreak: 'allys-zuerst' },
   turnsPerRound: 1,
-  ko: {
-    resourceId: null,
-    allies: 'bewusstlos',
-    enemies: 'tot',
-    unconsciousExcludedFromVictory: true,
-    defeatOnLanternLoss: false,
-  },
+  defeat: { unconsciousTurns: 2, unconsciousCount: 'alle' },
 };
 
-/** Ergänzt fehlende Werte (z. B. aus älteren Spielständen) mit den Standardwerten. */
+/** Ergänzt fehlende Werte mit den Standardwerten und entfernt veraltete Einstellungen. */
 export function normalizeRules(partial: unknown): Rules {
   const p = (partial && typeof partial === 'object' ? partial : {}) as Partial<Rules>;
+  const d = DEFAULT_RULES;
   return {
-    ...DEFAULT_RULES,
-    ...p,
-    light: { ...DEFAULT_RULES.light, ...p.light },
-    initiative: { ...DEFAULT_RULES.initiative, ...p.initiative },
-    ko: { ...DEFAULT_RULES.ko, ...p.ko },
+    diagonal: p.diagonal ?? d.diagonal,
+    cornerCutting: p.cornerCutting ?? d.cornerCutting,
+    light: {
+      lanternRadius: p.light?.lanternRadius ?? d.light.lanternRadius,
+      shape: p.light?.shape ?? d.light.shape,
+      rememberExplored: p.light?.rememberExplored ?? d.light.rememberExplored,
+    },
+    initiative: {
+      criteria: p.initiative?.criteria ?? [],
+      tieBreak: p.initiative?.tieBreak ?? d.initiative.tieBreak,
+    },
+    turnsPerRound: p.turnsPerRound ?? d.turnsPerRound,
+    defeat: {
+      unconsciousTurns: p.defeat?.unconsciousTurns ?? d.defeat.unconsciousTurns,
+      unconsciousCount: p.defeat?.unconsciousCount ?? d.defeat.unconsciousCount,
+    },
   };
 }

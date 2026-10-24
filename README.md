@@ -160,12 +160,15 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 **Feste Regeln (nicht einstellbar):**
 - **Spielfeld:** quadratisches Raster, diagonale Bewegung möglich.
 - **Jedes Level ist ein Kampf.** Alle Handlungen laufen in der Initiative-Reihenfolge ab; alle Gegner handeln darin mit – auch nicht sichtbare.
-- **Nebel & Laterne:** Ohne Licht sieht man (fast) kein Feld. Licht bringen Licht-Fähigkeiten; die **Laterne** ist fest verankert: In jedem Team gibt es einen **Laternenträger**, der jedes Level auf einem vorgegebenen Feld beginnt und dort nicht verschoben werden kann.
+- **Nebel & Laterne:** Ohne Licht sieht man (fast) kein Feld. Licht bringen Licht-Fähigkeiten; die **Laterne** ist fest verankert: In jedem Team gibt es einen **Laternenträger**, der jedes Level auf einem vorgegebenen Feld beginnt und dort nicht verschoben werden kann. Die Laterne brennt auch, wenn ihr Träger bewusstlos ist.
+- **Schatten** werfen nur Objekte/Gelände, die bei ihrer Erstellung als schattenwerfend festgelegt wurden. Wie weit ein Charakter ohne Licht sieht (**Eigensicht**), wird bei der Charaktererstellung festgelegt.
 - **Platzierung vor Runde 1:** Alle übrigen Allys werden frei innerhalb des Lichtkegels platziert und können bis zur Bestätigung beliebig verschoben (bzw. getauscht) werden. Im nächsten Level wird die Platzierung relativ zum Laternenträger wiederholt, soweit möglich (sonst nächstes freies Feld im Licht), und kann erneut angepasst werden.
 - **Initiative:** wird zu Beginn jedes Levels anhand von Werten festgelegt und gilt für das ganze Level. Unterschiedliche Geschwindigkeiten spielen keine Rolle. Pro Runde hat jeder Charakter regulär einen Zug; zusätzliche Züge (z. B. Reaktionen) sind möglich.
 - **Züge bestehen aus Aktionen:** Jede Aktion (auch Bewegung) ist eine Fähigkeit. Jeder Charakter hat **Aktionsplätze**, die jeweils eine Auswahl an Fähigkeiten anbieten (z. B. A: Platz 1 = Bewegung, Platz 2 = Angriff *oder* Zauber; B: Platz 1 = Bewegung *oder* Angriff, Platz 2 = Zauber). Details in Abschnitt 5.
-- **Sieg:** sobald alle Allys auf je einem **Siegfeld** stehen.
-- **Niederlage:** wenn kein Ally mehr kampffähig ist.
+- **Sieg:** sobald **alle** Allys auf je einem **Siegfeld** stehen – auch bewusstlose (keiner wird zurückgelassen; ein bewusstloser Charakter muss z. B. getragen werden). Bis dahin sind Siegfelder gewöhnliche Felder: Sie können wieder verlassen werden, man kann darauf angreifen und angegriffen werden.
+- **Niemand stirbt.** „Bewusstlos“ ist ein **fester Effekt** (Abschnitt 4), der z. B. bei 0 LP eintritt. Bewusstlose verpassen ihre Züge.
+- **Run verloren** (die Gruppe flieht): nach den Einstellungen im Regelwerk (s. u.) und immer, wenn alle Allys bewusstlos sind. Danach: **Züge rückgängig machen** (beliebig viele), **Level neu starten** oder **zurück zum Menü**.
+- Was mit Gegnern passiert (z. B. bei 0 LP), wird **beim jeweiligen Gegner** festgelegt (Abschnitt 7).
 
 **Einstellbar im Baustein „Regelwerk“** (mehrere Regelwerke möglich, Auswahl pro Spiel unter „Neues Spiel“; ohne Auswahl gelten die Standardwerte):
 | Einstellung | Standard |
@@ -174,22 +177,19 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | Ecken schneiden (diagonal an Hindernis-Ecken vorbei) | aus |
 | Laternen-Radius (Standard, je Ally später abweichend möglich) | 3 |
 | Form des Lichtkegels (Kreis / Quadrat) | Kreis |
-| Hindernisse werfen Schatten | an |
-| Eigensicht jedes Allys ohne Licht (0 = nur eigenes Feld) | 0 |
 | Erkundete Felder bleiben aufgedeckt (Gelände ja, Figuren nein) | an |
 | Initiative-Wert = Summe aus (Wert × Faktor), Werte aus den Ressourcen | – |
 | Bei Initiative-Gleichstand: Allys zuerst / Gegner zuerst / abwechselnd | Allys zuerst |
 | Züge pro Charakter und Runde | 1 |
-| K.O. bei 0 von (Ressource, z. B. LP) | – |
-| Allys bei K.O.: bewusstlos (wiederbelebbar) / tot (entfernt) | bewusstlos |
-| Gegner bei K.O.: bewusstlos / tot | tot |
-| Bewusstlose Allys müssen kein Siegfeld erreichen | an |
-| Niederlage, wenn der Laternenträger K.O. geht | aus |
+| Run verloren, wenn ein Ally so viele eigene Züge am Stück bewusstlos ist (gilt auch für den Laternenträger; 0 = aus) | 2 |
+| Run verloren, wenn gleichzeitig bewusstlos sind: alle Allys / bestimmte Anzahl | alle |
 
-Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schatten und Eigensicht mit den aktuellen Einstellungen zeigt.
+„Standardwerte“ sind die Voreinstellungen eines neuen Regelwerks (bzw. die Regeln, wenn kein Regelwerk gewählt ist) – keine Charakterwerte. Stats sind Ressourcen und werden beim Charakter individuell hinzugefügt.
+
+Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Schatten mit den aktuellen Einstellungen zeigt.
 
 **Umsetzung:**
-- `src/engine/` – Spiellogik ohne Oberfläche (mit Tests): `grid.ts` (Raster, Entfernung, Sichtlinie, erreichbare Felder), `light.ts` (Licht & Nebel), `initiative.ts`, `battle.ts` (Platzierung, Runden/Züge/Aktionsplätze, K.O., Sieg/Niederlage), `rules.ts` (Regelwerk & Standardwerte)
+- `src/engine/` – Spiellogik ohne Oberfläche (mit Tests): `grid.ts` (Raster, Entfernung, Sichtlinie, erreichbare Felder), `light.ts` (Licht & Nebel), `initiative.ts`, `battle.ts` (Platzierung, Runden/Züge/Aktionsplätze, Bewusstlosigkeit, Sieg/Run verloren), `history.ts` (Züge rückgängig), `rules.ts` (Regelwerk & Standardwerte)
 - Der Kampfzustand ist reines JSON und kann direkt als Spielstand gespeichert werden.
 - Spielbar wird der Ablauf mit der Kampf-Oberfläche (Abschnitt 13).
 
@@ -200,7 +200,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 ### 3 – Ressourcen & Attribute
 **Ziel:** Frei definierbare Werte, mit denen Charaktere und Fähigkeiten arbeiten.
 - Ressourcen anlegen (z. B. LP, Mana, Ausdauer, Wut, Gold) mit Min/Max, Startwert, Regeneration
-- Lebenspunkte sind eine normale Ressource; das Regelwerk legt fest, bei welcher Ressource 0 = K.O. bedeutet
+- Lebenspunkte sind eine normale Ressource; wann „Bewusstlos“ eintritt (z. B. LP = 0), legt der feste Effekt fest (Abschnitt 4)
 - Ressourcen/Werte liefern die Grundlage für den Initiative-Wert (Abschnitt 2)
 - Attribute/Stats (z. B. Stärke, Verteidigung, Tempo) – fest vorgegeben oder frei definierbar?
 - Teamweite vs. charakterbezogene Ressourcen
@@ -209,6 +209,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 
 ### 4 – Effekte
 **Ziel:** Wiederverwendbare Wirkungen als Bausteine für Fähigkeiten, Objekte und Gelände.
+- **Fester Effekt „Bewusstlos“:** Auslöser (z. B. LP = 0), Charakter verpasst seine Züge, kann getragen/aufgeweckt werden
 - Effekttypen (Schaden, Heilung, Ressource ändern, Attribut ändern, Status wie Gift/Betäubung, Bewegung/Rückstoß, Beschwörung …)
 - Dauer, Stapelbarkeit, Auslöser (sofort, pro Runde, beim Betreten, beim Treffer …)
 - Bedingungen (z. B. „wenn Ziel vergiftet ist“)
@@ -235,6 +236,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 - ~~Name, Bild/Symbol~~ → bereits vorhanden: Titel, Notiz, Form, Farbe, Größe (Abschnitt 1)
 - Attribute, Ressourcen, Fähigkeiten, Aktionsplätze
 - Laterne: Kann der Ally Laternenträger sein? Eigener Laternen-Radius?
+- **Eigensicht** ohne Licht (Radius, 0 = nur eigenes Feld)
 - Zusätzliche Züge pro Runde / Reaktionen
 - Ausrüstung/Inventar-Plätze?
 - Klassen, Stufen/Levelaufstieg?
@@ -246,6 +248,8 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 - Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
 - Werte und Fähigkeiten (wie Allys)
 - Verhalten/KI: einfache Regeln (z. B. „greift schwächstes Ziel an“, „heilt bei < 30 % LP“) – frei konfigurierbar?
+- Was passiert bei 0 LP o. Ä. (bewusstlos, flieht, verschwindet …)
+- **Eigensicht** ohne Licht
 - Beute/Belohnungen beim Besiegen
 
 **Offene Punkte / Entscheidungen:** –
@@ -255,6 +259,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 - Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
 - Typen: Verbrauchsgegenstände, Ausrüstung, Schlüssel/Quest-Objekte, Fallen, interaktive Map-Objekte (Truhen, Hebel)?
 - Wirkung über Effekte
+- **Wirft Schatten** (blockiert Licht/Sicht) und blockiert ggf. Fernangriffe – pro Objekt einstellbar
 - Stapelbarkeit, Inventar (Team oder pro Charakter)
 
 **Offene Punkte / Entscheidungen:** –
@@ -301,6 +306,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schat
 - Auswahl von Bewegung, Fähigkeit, Gegenstand, Ziel
 - Kampf-Log (was ist passiert, welche Zahlen wurden berechnet?)
 - Gegnerzüge sichtbar/nachvollziehbar
+- Ende-Bildschirm bei „Run verloren“: beliebig viele Züge rückgängig machen, Level neu starten, zurück zum Menü
 
 **Offene Punkte / Entscheidungen:** –
 

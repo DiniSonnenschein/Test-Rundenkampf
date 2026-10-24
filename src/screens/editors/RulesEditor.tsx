@@ -1,13 +1,8 @@
-import { normalizeRules, type KoMode, type LightShape, type Rules, type TieBreak } from '../../engine/rules';
+import { normalizeRules, type LightShape, type Rules, type TieBreak } from '../../engine/rules';
 import { useCollection } from '../../data/store';
 import { Choice, RefSelect, Stepper, Toggle } from '../../ui/fields';
 import type { EditorProps } from './index';
 import { LightPreview } from './LightPreview';
-
-const KO_OPTIONS: { value: KoMode; label: string }[] = [
-  { value: 'bewusstlos', label: 'Bewusstlos' },
-  { value: 'tot', label: 'Tot (entfernt)' },
-];
 
 export function RulesEditor({ entry, set }: EditorProps) {
   const rules = normalizeRules(entry.rules);
@@ -32,7 +27,11 @@ export function RulesEditor({ entry, set }: EditorProps) {
 
       <section className="card fields">
         <h2>Licht & Nebel</h2>
-        <p className="muted small">Ohne Licht liegt alles im Nebel. Der Laternenträger beginnt jedes Level auf einem festen Feld.</p>
+        <p className="muted small">
+          Ohne Licht liegt alles im Nebel. Der Laternenträger beginnt jedes Level auf einem festen Feld; seine Laterne brennt auch, wenn er
+          bewusstlos ist. Welche Objekte Schatten werfen und wie weit ein Charakter ohne Licht sieht, wird beim jeweiligen Objekt bzw.
+          Charakter festgelegt.
+        </p>
         <label className="field-label" htmlFor="lantern">Laternen-Radius (Standard)</label>
         <Stepper id="lantern" value={rules.light.lanternRadius} min={0} max={20} onChange={(v) => update((r) => ({ ...r, light: { ...r.light, lanternRadius: v } }))} />
         <span className="field-label">Form des Lichtkegels</span>
@@ -41,14 +40,6 @@ export function RulesEditor({ entry, set }: EditorProps) {
           options={[{ value: 'kreis', label: 'Kreis' }, { value: 'quadrat', label: 'Quadrat' }]}
           onChange={(v) => update((r) => ({ ...r, light: { ...r.light, shape: v } }))}
         />
-        <Toggle
-          label="Hindernisse werfen Schatten"
-          checked={rules.light.blockedBySight}
-          onChange={(v) => update((r) => ({ ...r, light: { ...r.light, blockedBySight: v } }))}
-        />
-        <label className="field-label" htmlFor="ownsight">Eigensicht jedes Allys ohne Licht</label>
-        <Stepper id="ownsight" value={rules.light.ownSight} min={0} max={10} onChange={(v) => update((r) => ({ ...r, light: { ...r.light, ownSight: v } }))} />
-        <p className="muted small">0 = nur das eigene Feld</p>
         <Toggle
           label="Erkundete Felder bleiben aufgedeckt"
           hint="Gelände bleibt sichtbar, Figuren darauf nicht"
@@ -102,35 +93,45 @@ export function RulesEditor({ entry, set }: EditorProps) {
       </section>
 
       <section className="card fields">
-        <h2>K.O.</h2>
-        <label className="field-label" htmlFor="ko-res">K.O. bei 0 von</label>
-        <RefSelect id="ko-res" collection="ressourcen" value={rules.ko.resourceId} emptyLabel="– keine (niemand geht K.O.) –" onChange={(id) => update((r) => ({ ...r, ko: { ...r.ko, resourceId: id } }))} />
-        <span className="field-label">Allys bei K.O.</span>
-        <Choice<KoMode> value={rules.ko.allies} options={KO_OPTIONS} onChange={(v) => update((r) => ({ ...r, ko: { ...r.ko, allies: v } }))} />
-        <span className="field-label">Gegner bei K.O.</span>
-        <Choice<KoMode> value={rules.ko.enemies} options={KO_OPTIONS} onChange={(v) => update((r) => ({ ...r, ko: { ...r.ko, enemies: v } }))} />
-        <Toggle
-          label="Bewusstlose Allys müssen kein Siegfeld erreichen"
-          checked={rules.ko.unconsciousExcludedFromVictory}
-          onChange={(v) => update((r) => ({ ...r, ko: { ...r.ko, unconsciousExcludedFromVictory: v } }))}
+        <h2>Run verloren</h2>
+        <p className="muted small">
+          Niemand stirbt – die Gruppe flieht, bevor es so weit kommt. „Bewusstlos“ ist ein fester Effekt (Abschnitt 4).
+        </p>
+        <label className="field-label" htmlFor="unc-turns">Wenn ein Ally so viele eigene Züge am Stück bewusstlos ist</label>
+        <Stepper
+          id="unc-turns"
+          value={rules.defeat.unconsciousTurns}
+          min={0}
+          max={20}
+          onChange={(v) => update((r) => ({ ...r, defeat: { ...r.defeat, unconsciousTurns: v } }))}
         />
-        <Toggle
-          label="Niederlage, wenn der Laternenträger K.O. geht"
-          checked={rules.ko.defeatOnLanternLoss}
-          onChange={(v) => update((r) => ({ ...r, ko: { ...r.ko, defeatOnLanternLoss: v } }))}
+        <p className="muted small">0 = aus. Gilt auch für den Laternenträger.</p>
+        <span className="field-label">Oder wenn gleichzeitig bewusstlos sind</span>
+        <Choice<'alle' | 'anzahl'>
+          value={rules.defeat.unconsciousCount === 'alle' ? 'alle' : 'anzahl'}
+          options={[{ value: 'alle', label: 'Alle Allys' }, { value: 'anzahl', label: 'Bestimmte Anzahl' }]}
+          onChange={(v) => update((r) => ({ ...r, defeat: { ...r.defeat, unconsciousCount: v === 'alle' ? 'alle' : 2 } }))}
         />
-        <p className="muted small">Niederlage immer, wenn kein Ally mehr kampffähig ist.</p>
+        {rules.defeat.unconsciousCount !== 'alle' && (
+          <Stepper
+            value={rules.defeat.unconsciousCount}
+            min={1}
+            max={20}
+            onChange={(v) => update((r) => ({ ...r, defeat: { ...r.defeat, unconsciousCount: v } }))}
+          />
+        )}
       </section>
 
       <section className="card">
         <h2>Feste Regeln</h2>
         <ul className="fixed-rules muted">
           <li>Quadratisches Raster</li>
-          <li>Nebel; Sicht nur durch Licht (Laterne & Licht-Fähigkeiten)</li>
+          <li>Nebel; Sicht nur durch Licht (Laterne & Licht-Fähigkeiten) und die Eigensicht der Charaktere</li>
           <li>Vor Runde 1: Laternenträger fest, übrige Allys frei im Lichtkegel platzierbar; im nächsten Level wird die Platzierung möglichst wiederholt</li>
           <li>Initiative-Reihenfolge einzelner Charaktere, festgelegt zu Beginn des Levels</li>
           <li>Ein Zug besteht aus beliebig vielen Aktionen (Fähigkeiten)</li>
-          <li>Sieg, sobald alle Allys auf je einem Siegfeld stehen</li>
+          <li>Sieg, sobald alle Allys (auch bewusstlose – keiner wird zurückgelassen) auf je einem Siegfeld stehen; bis dahin sind Siegfelder gewöhnliche Felder</li>
+          <li>Run verloren, wenn alle Allys bewusstlos sind; danach: Züge rückgängig machen, Level neu starten oder zurück zum Menü</li>
         </ul>
       </section>
     </>
