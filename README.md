@@ -12,6 +12,9 @@ Sie ist **nicht** das eigentliche Spiel, sondern ein Werkzeug, um:
 
 Leitgedanke: Alles soll **einfach zu bearbeiten** sein. Neue Ideen sollen in wenigen Minuten angelegt und getestet werden können – ohne Programmierung.
 
+**App öffnen / installieren:** https://dinisonnenschein.github.io/Test-Rundenkampf/
+Auf dem Android-Handy in Chrome öffnen → Menü (⋮) → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Danach läuft die App auch offline.
+
 ## Grober Aufbau
 
 Beim Öffnen der App erscheint ein **Startbildschirm** mit drei Optionen:
@@ -68,7 +71,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 | # | Abschnitt | Status |
 |---|---|---|
-| 0 | Technische Grundlagen | 🟨 |
+| 0 | Technische Grundlagen | ✅ |
 | 1 | App-Gerüst & Navigation (Startbildschirm) | ⬜ |
 | 2 | Kampfregeln – der Kern | ⬜ |
 | 3 | Ressourcen & Attribute | ⬜ |
@@ -101,8 +104,20 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - **Datenhaltung:** nur lokal auf dem Gerät. Es geht ums Ausprobieren, nicht um umfangreiche Archivierung; kein Cloud-Sync.
 - **Datenformat:** Alle Inhalte werden als JSON gespeichert.
 - **Bezug zum PC-Game:** Das PC-Game wird in **GameMaker** entwickelt. Eine spätere Übernahme der JSON-Inhalte ist wünschenswert, aber kein hartes Ziel: Die App darf Inhalte flexibler/abstrakter beschreiben, als es im Spiel später umgesetzt wird. Flexibilität für das Testen hat Vorrang vor direkter Übertragbarkeit.
+- **Technik:** TypeScript + React + Vite. Die Kampf- und Spiellogik wird getrennt von der Oberfläche programmiert (automatisch testbar, Vorlage für GameMaker).
+- **Anpassbare Regeln:** Grundregeln (z. B. Kampfregeln) werden möglichst als Einstellungen statt fest im Code umgesetzt, damit sie später leicht geändert werden können. Änderungswünsche meldest du, wenn sie aufkommen.
+- **Veröffentlichung:** über GitHub Pages. Jeder Push auf den Entwicklungs-Branch testet und veröffentlicht die App automatisch.
+- **Backup:** Export/Import aller Inhalte als JSON-Datei (Vorgriff auf Abschnitt 16).
+- **Gerät:** ausschließlich Android-Smartphone, nur **Hochformat**.
+- **Sprache:** nur Deutsch.
+- **Optik:** dunkle Oberfläche mit weißer Schrift, herbstliche Farbtöne im Hintergrund (Kürbis-Orange, Ahorn-Rot, Birken-Gold, Moos-Grün) und ein paar langsam fallende, bunte Blätter als Deko.
+- **Spielgrafik:** einfache Vektorformen in unterschiedlichen Farben, keine Bilder.
 
-**Offene Punkte:** siehe Klärung im Chat (Abschnitt 0)
+**Umsetzung:**
+- Projektstruktur: `src/data` (Speicherung & Backup), `src/ui` (Oberflächen-Bausteine), `src/styles/theme.css` (alle Farben zentral), später `src/engine` (Spiellogik)
+- Speicherung im `localStorage` des Browsers, je Baustein-Sammlung ein JSON-Eintrag
+- Installierbar (Manifest, App-Icon mit Ahornblatt) und offline nutzbar (Service Worker)
+- Automatische Tests (`npm test`) und Veröffentlichung per GitHub Actions
 
 ### 1 – App-Gerüst & Navigation
 **Ziel:** Lauffähige Grundstruktur der App.
