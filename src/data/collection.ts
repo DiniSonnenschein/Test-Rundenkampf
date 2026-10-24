@@ -16,6 +16,7 @@ export function createEntry(def: CollectionDef, folderId: string | null, now = n
     createdAt: ts,
     updatedAt: ts,
     ...(def.visible ? { ...DEFAULT_LOOK } : {}),
+    ...def.defaults?.(),
   };
 }
 

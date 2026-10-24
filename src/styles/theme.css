@@ -249,3 +249,41 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .menu-item.danger { color: var(--danger); }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes slide-up { from { transform: translateY(40px); opacity: 0; } }
+
+/* ---------- Abschnitt 2: Regelwerk ---------- */
+.small { font-size: .85rem; margin: 0; }
+.card h2 + .small { margin-top: -4px; }
+
+.toggle { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; cursor: pointer; }
+.toggle-text { flex: 1; display: flex; flex-direction: column; }
+.toggle-hint { font-size: .8rem; }
+.toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-switch {
+  flex: none; position: relative; width: 50px; height: 30px; border-radius: 15px;
+  background: var(--bg-deep); border: 1px solid var(--border); transition: background .15s;
+}
+.toggle-switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--text-muted); transition: transform .15s, background .15s;
+}
+.toggle input:checked + .toggle-switch { background: var(--accent); border-color: var(--accent-hi); }
+.toggle input:checked + .toggle-switch::after { transform: translateX(20px); background: #fff; }
+.toggle input:focus-visible + .toggle-switch { outline: 2px solid var(--accent-hi); }
+
+.choice { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.choice button {
+  flex: 1; min-height: 44px; padding: 6px 4px; border: none; border-left: 1px solid var(--border);
+  background: var(--bg-deep); color: var(--text-muted); font: inherit; font-size: .9rem; cursor: pointer;
+}
+.choice button:first-child { border-left: none; }
+.choice button.selected { background: var(--accent); color: #1f1410; font-weight: 600; }
+
+.criterion { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
+.criterion-row { display: flex; align-items: center; gap: 8px; }
+.criterion-row .stepper { flex: 1; }
+
+.light-preview { margin: 8px 0 0; }
+.light-preview svg { display: block; width: 100%; max-width: 320px; margin: 0 auto; border-radius: 8px; }
+.light-preview figcaption { font-size: .75rem; text-align: center; margin-top: 6px; }
+
+.fixed-rules { margin: 0; padding-left: 1.2em; line-height: 1.5; }

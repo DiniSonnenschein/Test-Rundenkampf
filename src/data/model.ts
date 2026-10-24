@@ -1,3 +1,5 @@
+import { DEFAULT_RULES } from '../engine/rules';
+
 // Gemeinsames Datenmodell aller Einträge im Erstell-Modus und unter „Neues Spiel“ / „Spielstand laden“.
 
 export interface Folder {
@@ -42,9 +44,15 @@ export interface CollectionDef {
   creatable?: boolean;
   /** Abschnitt im Sheet, in dem die weiteren Felder ausgearbeitet werden. */
   section: number;
+  /** Zusätzliche Startwerte neuer Einträge. */
+  defaults?: () => Record<string, unknown>;
 }
 
 export const BAUSTEINE: CollectionDef[] = [
+  {
+    key: 'regelwerke', label: 'Regelwerke', singular: 'Regelwerk', newTitle: 'Neues Regelwerk', icon: '📜', creatable: true, section: 2,
+    defaults: () => ({ rules: structuredClone(DEFAULT_RULES) }),
+  },
   { key: 'allys', label: 'Allys', singular: 'Ally', newTitle: 'Neuer Ally', icon: '🛡️', visible: true, creatable: true, section: 6 },
   { key: 'gegner', label: 'Gegner', singular: 'Gegner', newTitle: 'Neuer Gegner', icon: '👹', visible: true, creatable: true, section: 7 },
   { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
@@ -58,6 +66,7 @@ export const BAUSTEINE: CollectionDef[] = [
 
 export const SPIELE: CollectionDef = {
   key: 'spiele', label: 'Neues Spiel', singular: 'Spiel', newTitle: 'Neues Spiel', icon: '▶️', creatable: true, section: 12,
+  defaults: () => ({ regelwerkId: null }),
 };
 
 export const SPIELSTAENDE: CollectionDef = {

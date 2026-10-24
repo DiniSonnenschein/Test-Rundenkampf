@@ -29,6 +29,7 @@ Beim Öffnen der App erscheint ein **Startbildschirm** mit drei Optionen:
 
 | Baustein | Kurzbeschreibung |
 |---|---|
+| Regelwerke | Einstellbare Grundregeln eines Kampfes (Abschnitt 2) |
 | Allys | Spielbare Charaktere |
 | Gegner | Nicht-spielbare Charaktere (inkl. Verhalten/KI) |
 | Objekte | Vor allem sammelbare Gegenstände |
@@ -73,7 +74,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 |---|---|---|
 | 0 | Technische Grundlagen | ✅ |
 | 1 | App-Gerüst & Navigation (Startbildschirm) | ✅ |
-| 2 | Kampfregeln – der Kern | ⬜ |
+| 2 | Kampfregeln – der Kern | ✅ |
 | 3 | Ressourcen & Attribute | ⬜ |
 | 4 | Effekte | ⬜ |
 | 5 | Fähigkeiten | ⬜ |
@@ -153,18 +154,54 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 2 – Kampfregeln – der Kern
 **Ziel:** Die grundlegenden Spielregeln, auf denen alles andere aufbaut.
-- Spielfeld: Raster (Quadrat/Hex)? Bewegung auf dem Feld oder reine Positionsreihen?
-- Rundenablauf: Initiative/Zugreihenfolge, Phasen, Aktionen pro Zug
-- Bewegung, Reichweite, Sichtlinie
-- Trefferberechnung, Schaden, Zufall (Würfel? kritische Treffer?)
-- Sieg- und Niederlagebedingungen, Tod/K.O. von Charakteren
-- Was passiert zwischen Leveln (Heilung, Belohnungen, Levelaufstieg?)
 
-**Offene Punkte / Entscheidungen:** –
+**Grundsatz:** Es gibt bewusst **keine festen Regeln für Lebenspunkte, Schaden oder Verteidigung**. Lebenspunkte sind eine *Ressource* (Abschnitt 3), Angriffe sind *Fähigkeiten* (Abschnitt 5), Schutz/Verteidigung entsteht über *Effekte* (Abschnitt 4). **Kein Zufall:** alles ist berechenbar und planbar (keine Trefferchance, keine kritischen Treffer, keine Schadensschwankung).
+
+**Feste Regeln (nicht einstellbar):**
+- **Spielfeld:** quadratisches Raster, diagonale Bewegung möglich.
+- **Jedes Level ist ein Kampf.** Alle Handlungen laufen in der Initiative-Reihenfolge ab; alle Gegner handeln darin mit – auch nicht sichtbare.
+- **Nebel & Laterne:** Ohne Licht sieht man (fast) kein Feld. Licht bringen Licht-Fähigkeiten; die **Laterne** ist fest verankert: In jedem Team gibt es einen **Laternenträger**, der jedes Level auf einem vorgegebenen Feld beginnt und dort nicht verschoben werden kann.
+- **Platzierung vor Runde 1:** Alle übrigen Allys werden frei innerhalb des Lichtkegels platziert und können bis zur Bestätigung beliebig verschoben (bzw. getauscht) werden. Im nächsten Level wird die Platzierung relativ zum Laternenträger wiederholt, soweit möglich (sonst nächstes freies Feld im Licht), und kann erneut angepasst werden.
+- **Initiative:** wird zu Beginn jedes Levels anhand von Werten festgelegt und gilt für das ganze Level. Unterschiedliche Geschwindigkeiten spielen keine Rolle. Pro Runde hat jeder Charakter regulär einen Zug; zusätzliche Züge (z. B. Reaktionen) sind möglich.
+- **Züge bestehen aus Aktionen:** Jede Aktion (auch Bewegung) ist eine Fähigkeit. Jeder Charakter hat **Aktionsplätze**, die jeweils eine Auswahl an Fähigkeiten anbieten (z. B. A: Platz 1 = Bewegung, Platz 2 = Angriff *oder* Zauber; B: Platz 1 = Bewegung *oder* Angriff, Platz 2 = Zauber). Details in Abschnitt 5.
+- **Sieg:** sobald alle Allys auf je einem **Siegfeld** stehen.
+- **Niederlage:** wenn kein Ally mehr kampffähig ist.
+
+**Einstellbar im Baustein „Regelwerk“** (mehrere Regelwerke möglich, Auswahl pro Spiel unter „Neues Spiel“; ohne Auswahl gelten die Standardwerte):
+| Einstellung | Standard |
+|---|---|
+| Diagonale Bewegung | an |
+| Ecken schneiden (diagonal an Hindernis-Ecken vorbei) | aus |
+| Laternen-Radius (Standard, je Ally später abweichend möglich) | 3 |
+| Form des Lichtkegels (Kreis / Quadrat) | Kreis |
+| Hindernisse werfen Schatten | an |
+| Eigensicht jedes Allys ohne Licht (0 = nur eigenes Feld) | 0 |
+| Erkundete Felder bleiben aufgedeckt (Gelände ja, Figuren nein) | an |
+| Initiative-Wert = Summe aus (Wert × Faktor), Werte aus den Ressourcen | – |
+| Bei Initiative-Gleichstand: Allys zuerst / Gegner zuerst / abwechselnd | Allys zuerst |
+| Züge pro Charakter und Runde | 1 |
+| K.O. bei 0 von (Ressource, z. B. LP) | – |
+| Allys bei K.O.: bewusstlos (wiederbelebbar) / tot (entfernt) | bewusstlos |
+| Gegner bei K.O.: bewusstlos / tot | tot |
+| Bewusstlose Allys müssen kein Siegfeld erreichen | an |
+| Niederlage, wenn der Laternenträger K.O. geht | aus |
+
+Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne, Schatten und Eigensicht mit den aktuellen Einstellungen zeigt.
+
+**Umsetzung:**
+- `src/engine/` – Spiellogik ohne Oberfläche (mit Tests): `grid.ts` (Raster, Entfernung, Sichtlinie, erreichbare Felder), `light.ts` (Licht & Nebel), `initiative.ts`, `battle.ts` (Platzierung, Runden/Züge/Aktionsplätze, K.O., Sieg/Niederlage), `rules.ts` (Regelwerk & Standardwerte)
+- Der Kampfzustand ist reines JSON und kann direkt als Spielstand gespeichert werden.
+- Spielbar wird der Ablauf mit der Kampf-Oberfläche (Abschnitt 13).
+
+**Offene Punkte (für spätere Abschnitte):**
+- Belegen Figuren mit Größe > 1 mehrere Felder? (vorerst belegt jede Figur genau ein Feld)
+- Dürfen Figuren durch verbündete/feindliche Figuren hindurchziehen? (vorerst nein)
 
 ### 3 – Ressourcen & Attribute
 **Ziel:** Frei definierbare Werte, mit denen Charaktere und Fähigkeiten arbeiten.
 - Ressourcen anlegen (z. B. LP, Mana, Ausdauer, Wut, Gold) mit Min/Max, Startwert, Regeneration
+- Lebenspunkte sind eine normale Ressource; das Regelwerk legt fest, bei welcher Ressource 0 = K.O. bedeutet
+- Ressourcen/Werte liefern die Grundlage für den Initiative-Wert (Abschnitt 2)
 - Attribute/Stats (z. B. Stärke, Verteidigung, Tempo) – fest vorgegeben oder frei definierbar?
 - Teamweite vs. charakterbezogene Ressourcen
 
@@ -183,6 +220,10 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 5 – Fähigkeiten
 **Ziel:** Aktionen, die Allys und Gegner im Kampf nutzen.
+- **Jede Aktion ist eine Fähigkeit** – auch Bewegung, Angriff, Licht („Licht ins Dunkel“)
+- **Aktionsplätze** pro Charakter: jeder Platz bietet eine Auswahl an Fähigkeiten (Abschnitt 2)
+- Angriffe verändern Ressourcen des Ziels (z. B. LP −3); Schutz davor über Effekte
+- Ob eine Fähigkeit durch Hindernisse blockiert wird (Sichtlinie), ist pro Fähigkeit einstellbar
 - Kosten (Ressourcen), Abklingzeit, Reichweite, Zielart (Einzelziel, Fläche, selbst, Verbündete)
 - Kombination mehrerer Effekte
 - Passive Fähigkeiten?
@@ -192,7 +233,9 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 ### 6 – Allys
 **Ziel:** Spielbare Charaktere anlegen.
 - ~~Name, Bild/Symbol~~ → bereits vorhanden: Titel, Notiz, Form, Farbe, Größe (Abschnitt 1)
-- Attribute, Ressourcen, Fähigkeiten
+- Attribute, Ressourcen, Fähigkeiten, Aktionsplätze
+- Laterne: Kann der Ally Laternenträger sein? Eigener Laternen-Radius?
+- Zusätzliche Züge pro Runde / Reaktionen
 - Ausrüstung/Inventar-Plätze?
 - Klassen, Stufen/Levelaufstieg?
 
@@ -218,7 +261,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 9 – Geländearten
 **Ziel:** Felder mit Eigenschaften und Effekten.
-- Begehbarkeit, Bewegungskosten, Sichtblockade
+- Begehbarkeit, Bewegungskosten, Sichtblockade (wirft Schatten, blockiert ggf. Fernangriffe)
 - Effekte beim Betreten/Stehen/Verlassen (z. B. Lava, Eis, Heilquelle)
 - Darstellung (Farbe/Symbol/Bild)
 
@@ -227,8 +270,9 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 ### 10 – Level-Editor
 **Ziel:** Maps bauen und befüllen.
 - Größe und Form der Map
-- Gelände „malen“, Gegner und Objekte platzieren, Startpositionen des Teams
-- Level-Ziele (alle Gegner besiegen, Ausgang erreichen, X Runden überleben …)
+- Gelände „malen“, Gegner und Objekte platzieren
+- **Laternen-Startfeld** festlegen (dort beginnt der Laternenträger)
+- **Siegfelder** festlegen (Sieg, wenn alle Allys auf je einem Siegfeld stehen)
 - Bedienbarkeit auf dem Smartphone (Zoom, Scrollen, Touch-Werkzeuge)
 
 **Offene Punkte / Entscheidungen:** –
@@ -244,7 +288,8 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 **Ziel:** Testlauf konfigurieren und starten.
 - Liste der Spiel-Konfigurationen mit Ordnern/Suche/Duplizieren existiert bereits (Abschnitt 1)
 - Auswahl: Dungeon oder einzelne Level
-- Team zusammenstellen (Anzahl Allys?)
+- Regelwerk wählen (bereits vorhanden, Abschnitt 2)
+- Team zusammenstellen (Anzahl Allys?), Laternenträger bestimmen
 - Startgegenstände festlegen
 - ggf. Test-Optionen (z. B. Gegner-Stärke-Multiplikator, Zufall fixieren)
 
