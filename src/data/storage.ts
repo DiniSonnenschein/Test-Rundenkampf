@@ -46,6 +46,11 @@ export class Storage {
     return names.sort();
   }
 
+  /** Löscht alle Inhalte dieser App. */
+  clearAll(): void {
+    for (const name of this.collections()) this.backend.removeItem(PREFIX + name);
+  }
+
   exportAll(now = new Date()): BackupFile {
     const collections: Record<string, unknown> = {};
     for (const name of this.collections()) collections[name] = this.load(name, null);
@@ -66,7 +71,7 @@ export class Storage {
     if (file.schemaVersion > SCHEMA_VERSION) {
       throw new Error('Das Backup stammt aus einer neueren App-Version.');
     }
-    for (const name of this.collections()) this.backend.removeItem(PREFIX + name);
+    this.clearAll();
     for (const [name, data] of Object.entries(file.collections)) this.save(name, data);
   }
 }

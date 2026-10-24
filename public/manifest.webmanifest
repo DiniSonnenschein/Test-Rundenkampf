@@ -1,6 +1,6 @@
 {
-  "name": "Test-Rundenkampf",
-  "short_name": "Rundenkampf",
+  "name": "Rundenkämpfe",
+  "short_name": "Rundenkämpfe",
   "description": "Testumgebung für rundenbasierte Dungeon-Kämpfe",
   "lang": "de",
   "start_url": "./",

@@ -52,3 +52,15 @@ describe('Storage', () => {
     ).toThrow('neueren');
   });
 });
+
+describe('Storage.clearAll', () => {
+  it('löscht nur Inhalte dieser App', () => {
+    const backend = memoryBackend();
+    backend.setItem('anderes', 'x');
+    const s = new Storage(backend);
+    s.save('allys', []);
+    s.clearAll();
+    expect(s.collections()).toEqual([]);
+    expect(backend.getItem('anderes')).toBe('x');
+  });
+});

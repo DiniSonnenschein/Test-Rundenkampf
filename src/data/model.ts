@@ -1,0 +1,73 @@
+// Gemeinsames Datenmodell aller Einträge im Erstell-Modus und unter „Neues Spiel“ / „Spielstand laden“.
+
+export interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  updatedAt: string;
+}
+
+/** Jeder Eintrag beginnt mit Titel und Notiz; je nach Art kommen weitere Felder hinzu. */
+export interface Entry {
+  id: string;
+  title: string;
+  note: string;
+  folderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  [field: string]: unknown;
+}
+
+/** Darstellung von sichtbaren Spielfiguren/-objekten (Allys, Gegner, Objekte). */
+export interface Look {
+  shape: string;
+  color: string;
+  size: number;
+}
+
+export interface Collection {
+  entries: Entry[];
+  folders: Folder[];
+}
+
+export interface CollectionDef {
+  key: string;
+  label: string;
+  singular: string;
+  newTitle: string;
+  icon: string;
+  /** Hat eine sichtbare Darstellung im Spiel (Form, Farbe, Größe). */
+  visible?: boolean;
+  /** Können neue Einträge direkt in der Liste angelegt werden? */
+  creatable?: boolean;
+  /** Abschnitt im Sheet, in dem die weiteren Felder ausgearbeitet werden. */
+  section: number;
+}
+
+export const BAUSTEINE: CollectionDef[] = [
+  { key: 'allys', label: 'Allys', singular: 'Ally', newTitle: 'Neuer Ally', icon: '🛡️', visible: true, creatable: true, section: 6 },
+  { key: 'gegner', label: 'Gegner', singular: 'Gegner', newTitle: 'Neuer Gegner', icon: '👹', visible: true, creatable: true, section: 7 },
+  { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
+  { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
+  { key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5 },
+  { key: 'effekte', label: 'Effekte', singular: 'Effekt', newTitle: 'Neuer Effekt', icon: '🔥', creatable: true, section: 4 },
+  { key: 'ressourcen', label: 'Ressourcen', singular: 'Ressource', newTitle: 'Neue Ressource', icon: '💧', creatable: true, section: 3 },
+  { key: 'level', label: 'Level', singular: 'Level', newTitle: 'Neues Level', icon: '🗺️', creatable: true, section: 10 },
+  { key: 'dungeons', label: 'Dungeons', singular: 'Dungeon', newTitle: 'Neuer Dungeon', icon: '🏰', creatable: true, section: 11 },
+];
+
+export const SPIELE: CollectionDef = {
+  key: 'spiele', label: 'Neues Spiel', singular: 'Spiel', newTitle: 'Neues Spiel', icon: '▶️', creatable: true, section: 12,
+};
+
+export const SPIELSTAENDE: CollectionDef = {
+  key: 'spielstaende', label: 'Spielstand laden', singular: 'Spielstand', newTitle: 'Neuer Spielstand', icon: '💾', section: 14,
+};
+
+export const ALL_DEFS: CollectionDef[] = [...BAUSTEINE, SPIELE, SPIELSTAENDE];
+
+export function getDef(key: string): CollectionDef | undefined {
+  return ALL_DEFS.find((d) => d.key === key);
+}
+
+export const DEFAULT_LOOK: Look = { shape: 'kreis', color: '#d9772b', size: 1 };

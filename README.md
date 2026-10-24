@@ -1,4 +1,4 @@
-# Test-Rundenkampf – Testumgebung für rundenbasierte Dungeon-Kämpfe
+# Rundenkämpfe – Testumgebung für rundenbasierte Dungeon-Kämpfe
 
 ## Wozu dient diese App?
 
@@ -72,7 +72,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | # | Abschnitt | Status |
 |---|---|---|
 | 0 | Technische Grundlagen | ✅ |
-| 1 | App-Gerüst & Navigation (Startbildschirm) | ⬜ |
+| 1 | App-Gerüst & Navigation (Startbildschirm) | ✅ |
 | 2 | Kampfregeln – der Kern | ⬜ |
 | 3 | Ressourcen & Attribute | ⬜ |
 | 4 | Effekte | ⬜ |
@@ -125,7 +125,31 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - Grundnavigation zwischen den Modi
 - Einheitliches Grund-Layout für alle Editoren (Liste → Detailansicht → Bearbeiten/Kopieren/Löschen)
 
-**Offene Punkte / Entscheidungen:** –
+**Entscheidungen:**
+- **App-Name:** „Rundenkämpfe“.
+- **Startbildschirm:** drei große Knöpfe „Erstellen“, „Neues Spiel“, „Spielstand laden“; Zahnrad oben rechts öffnet die **Einstellungen** (Backup exportieren/importieren, alle Daten löschen mit doppelter Sicherheitsabfrage).
+- **Erstellen:** Kachel-Übersicht aller Bausteine mit Anzahl der Einträge.
+- **Einheitliche Liste** für alle Bausteine **und** für „Neues Spiel“ und „Spielstand laden“:
+  - Suchfeld (sucht in Titel und Notiz, über alle Ordner hinweg)
+  - **Ordner** (beliebig verschachtelt; umbenennen, löschen – beim Löschen wandert der Inhalt eine Ebene nach oben)
+  - automatische **alphabetische Sortierung**, Ordner zuerst
+  - kleine Anzeige von **Datum/Uhrzeit der letzten Änderung** je Eintrag
+  - pro Eintrag: öffnen, duplizieren („… (Kopie)“), in Ordner verschieben, löschen
+- **Automatisches Speichern** bei jeder Änderung.
+- **Löschen mit Verweisen:** Wird ein Eintrag noch woanders verwendet, erscheint eine Warnung mit allen Fundstellen; beim Löschen werden die Verweise dort entfernt.
+- **Gemeinsame Felder** jedes Eintrags (auch Spiele/Spielstände): **Titel**, **Notiz** (+ Ordner).
+- **Darstellung** für Allys, Gegner und Objekte (sichtbare Entitäten im Spiel):
+  - **Form** – Auswahl aus vorgespeicherten Vektorformen (vorläufig 8 Grundformen: Kreis, Quadrat, Dreieck, Raute, Fünfeck, Sechseck, Stern, Kreuz; die endgültige Formen-Bibliothek wird später ausgearbeitet)
+  - **Farbe** – Farbrad mit Helligkeitsregler, Hex-Eingabe und Herbst-Farbvorschlägen
+  - **Größe** – Standard 1, in Schritten anpassbar
+- **Navigation:** Zurück-Pfeil oben links; die Android-Zurück-Taste funktioniert ebenfalls.
+- **Neues Spiel:** Liste von Spiel-Konfigurationen (gleiche Funktionen wie im Editor). So lassen sich Test-Setups speichern, duplizieren und variieren. „Spielstand laden“ listet die beim Spielen gespeicherten Stände (dort kein „+ Neu“).
+
+**Umsetzung:**
+- `src/data/model.ts` – Datenmodell und Liste aller Bausteine (hier lassen sich Bausteine ergänzen)
+- `src/data/collection.ts`, `src/data/references.ts` – Ordner, Sortierung, Suche, Duplizieren, Verweise (mit Tests)
+- `src/screens/` – Startbildschirm, Erstellen, Liste, Eintrag, Einstellungen
+- `src/ui/` – Dialoge, Formen, Farbrad, Kopfzeile
 
 ### 2 – Kampfregeln – der Kern
 **Ziel:** Die grundlegenden Spielregeln, auf denen alles andere aufbaut.
@@ -167,7 +191,8 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 6 – Allys
 **Ziel:** Spielbare Charaktere anlegen.
-- Name, Bild/Symbol, Attribute, Ressourcen, Fähigkeiten
+- ~~Name, Bild/Symbol~~ → bereits vorhanden: Titel, Notiz, Form, Farbe, Größe (Abschnitt 1)
+- Attribute, Ressourcen, Fähigkeiten
 - Ausrüstung/Inventar-Plätze?
 - Klassen, Stufen/Levelaufstieg?
 
@@ -175,6 +200,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 7 – Gegner & Gegner-KI
 **Ziel:** Nicht-spielbare Charaktere inkl. Verhalten anlegen.
+- Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
 - Werte und Fähigkeiten (wie Allys)
 - Verhalten/KI: einfache Regeln (z. B. „greift schwächstes Ziel an“, „heilt bei < 30 % LP“) – frei konfigurierbar?
 - Beute/Belohnungen beim Besiegen
@@ -183,6 +209,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 8 – Objekte / Gegenstände
 **Ziel:** Sammelbare und nutzbare Gegenstände.
+- Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
 - Typen: Verbrauchsgegenstände, Ausrüstung, Schlüssel/Quest-Objekte, Fallen, interaktive Map-Objekte (Truhen, Hebel)?
 - Wirkung über Effekte
 - Stapelbarkeit, Inventar (Team oder pro Charakter)
@@ -215,6 +242,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 ### 12 – Neues Spiel (Setup)
 **Ziel:** Testlauf konfigurieren und starten.
+- Liste der Spiel-Konfigurationen mit Ordnern/Suche/Duplizieren existiert bereits (Abschnitt 1)
 - Auswahl: Dungeon oder einzelne Level
 - Team zusammenstellen (Anzahl Allys?)
 - Startgegenstände festlegen
