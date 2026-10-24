@@ -54,6 +54,8 @@ Wir gehen die Arbeitsabschnitte **Schritt für Schritt** durch. Für jeden Absch
 4. **Umsetzung & Test** – Umsetzung, danach Abnahme durch dich.
 5. **Dokumentation** – die getroffenen Entscheidungen werden in diesem Dokument im jeweiligen Abschnitt festgehalten.
 
+Zu Beginn jedes Abschnitts erklärt Claude im Chat, was genau mit dem Abschnitt gemeint ist und welche Fragen für wichtig gehalten werden.
+
 Status-Legende: ⬜ offen · 🟨 in Klärung · 🟦 in Umsetzung · ✅ fertig
 
 ---
@@ -66,7 +68,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 
 | # | Abschnitt | Status |
 |---|---|---|
-| 0 | Technische Grundlagen | ⬜ |
+| 0 | Technische Grundlagen | 🟨 |
 | 1 | App-Gerüst & Navigation (Startbildschirm) | ⬜ |
 | 2 | Kampfregeln – der Kern | ⬜ |
 | 3 | Ressourcen & Attribute | ⬜ |
@@ -94,7 +96,13 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - Datenformat für alle Inhalte (z. B. JSON), damit Inhalte später ggf. ins PC-Game übernommen werden können
 - Sprache der Oberfläche (Deutsch?)
 
-**Offene Punkte / Entscheidungen:** –
+**Entscheidungen:**
+- **Plattform:** Web-App (PWA), die auf dem Smartphone wie eine App installiert werden kann.
+- **Datenhaltung:** nur lokal auf dem Gerät. Es geht ums Ausprobieren, nicht um umfangreiche Archivierung; kein Cloud-Sync.
+- **Datenformat:** Alle Inhalte werden als JSON gespeichert.
+- **Bezug zum PC-Game:** Das PC-Game wird in **GameMaker** entwickelt. Eine spätere Übernahme der JSON-Inhalte ist wünschenswert, aber kein hartes Ziel: Die App darf Inhalte flexibler/abstrakter beschreiben, als es im Spiel später umgesetzt wird. Flexibilität für das Testen hat Vorrang vor direkter Übertragbarkeit.
+
+**Offene Punkte:** siehe Klärung im Chat (Abschnitt 0)
 
 ### 1 – App-Gerüst & Navigation
 **Ziel:** Lauffähige Grundstruktur der App.
@@ -129,7 +137,10 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - Dauer, Stapelbarkeit, Auslöser (sofort, pro Runde, beim Betreten, beim Treffer …)
 - Bedingungen (z. B. „wenn Ziel vergiftet ist“)
 
-**Offene Punkte / Entscheidungen:** –
+**Entscheidungen:**
+- Effekte werden als **eigener Baustein** im Erstell-Modus geführt. Fähigkeiten, Objekte und Geländearten setzen sich aus denselben Effekten zusammen.
+
+**Offene Punkte:** –
 
 ### 5 – Fähigkeiten
 **Ziel:** Aktionen, die Allys und Gegner im Kampf nutzen.
@@ -226,4 +237,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - Export/Import aller Inhalte als Datei
 - Format kompatibel zum PC-Game?
 
-**Offene Punkte / Entscheidungen:** –
+**Entscheidungen:**
+- Format: JSON (siehe Abschnitt 0). Übernahme nach GameMaker ist optional; die Struktur soll aber möglichst gut lesbar und dokumentiert sein, damit sie sich bei Bedarf übertragen lässt.
+
+**Offene Punkte:** –
