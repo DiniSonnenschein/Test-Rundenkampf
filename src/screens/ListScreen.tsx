@@ -10,6 +10,7 @@ import { useDialog } from '../ui/Dialog';
 import { formatDate } from '../ui/format';
 import { Header } from '../ui/Header';
 import { ShapeIcon } from '../ui/shapes';
+import { normalizeTerrain } from '../engine/terrain';
 import { useEntryActions } from './useEntryActions';
 
 export function ListScreen({ def, folderId }: { def: CollectionDef; folderId: string | null }) {
@@ -123,7 +124,13 @@ export function ListScreen({ def, folderId }: { def: CollectionDef; folderId: st
           <li key={e.id} className="row">
             <button className="row-main" onClick={() => navigate(routes.entry(def.key, e.id))}>
               <span className="row-icon">
-                {def.visible ? <ShapeIcon shape={String(e.shape)} color={String(e.color)} size={28} /> : def.icon}
+                {def.visible ? (
+                  <ShapeIcon shape={String(e.shape)} color={String(e.color)} size={28} />
+                ) : def.key === 'gelaende' ? (
+                  <TerrainSwatch colors={normalizeTerrain(e).colors} />
+                ) : (
+                  def.icon
+                )}
               </span>
               <span className="row-text">
                 <span className="row-title">{e.title || 'Ohne Titel'}</span>
@@ -156,5 +163,15 @@ export function ListScreen({ def, folderId }: { def: CollectionDef; folderId: st
         )}
       </div>
     </main>
+  );
+}
+
+function TerrainSwatch({ colors }: { colors: { light: string; dark: string } }) {
+  return (
+    <svg width={26} height={26} viewBox="0 0 2 2" aria-hidden="true" style={{ borderRadius: 4 }}>
+      <rect width={2} height={2} fill={colors.dark} />
+      <rect width={1} height={1} fill={colors.light} />
+      <rect x={1} y={1} width={1} height={1} fill={colors.light} />
+    </svg>
   );
 }

@@ -81,7 +81,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 6 | Allys | ✅ |
 | 7 | Gegner & Gegner-KI | ✅ |
 | 8 | Objekte / Gegenstände | ✅ |
-| 9 | Geländearten | ⬜ |
+| 9 | Geländearten | ✅ |
 | 10 | Level-Editor | ⬜ |
 | 11 | Dungeon-Editor | ⬜ |
 | 12 | Neues Spiel (Setup) | ⬜ |
@@ -443,12 +443,26 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - Neue Fähigkeits-Bausteine: Objekt verwenden / geben / werfen, Verborgenes aufdecken
 
 ### 9 – Geländearten
-**Ziel:** Felder mit Eigenschaften und Effekten.
-- Begehbarkeit, Bewegungskosten, Sichtblockade (wirft Schatten, blockiert ggf. Fernangriffe)
-- Effekte beim Betreten/Stehen/Verlassen (z. B. Lava, Eis, Heilquelle)
-- Darstellung (Farbe/Symbol/Bild)
+**Ziel:** Die Böden der Map – jedes Feld eines Levels hat genau eine Geländeart (änderbar durch Fähigkeiten bis Levelende oder durch geworfene Objekte). Keine Typen.
 
-**Offene Punkte / Entscheidungen:** –
+**Darstellung:** **zwei Farben** (hell/dunkel) – das Level ist wie ein Schachbrett aufgebaut, sodass die Felder ohne Raster erkennbar sind · optional ein halbtransparentes **Symbol** aus der Formen-Bibliothek.
+
+**Eigenschaften:**
+- **Begehbar:** ja / nein / nur für Charaktere mit bestimmten Typen oder Effekten
+- **Hindernis** (für Fähigkeiten) ja/nein · **wirft Schatten** ja/nein
+- **Rutschig:** Wer sich darauf bewegt, rutscht in Bewegungsrichtung weiter – bis das nächste Feld blockiert ist oder nicht-rutschiges Gelände erreicht wird.
+
+**Kostensteigerung:** Wer auf diesem Gelände steht, zahlt für Fähigkeiten bestimmter Typen (leer = alle) X mehr einer Ressource – egal, wofür die Fähigkeit eingesetzt wird.
+
+**Licht:** leuchtet ja/nein mit Leuchtbereich.
+
+**Wirkungen:** wie bei Objekten (Bereichs-Auslöser: betritt / verlässt / steht zu Beginn/Ende des eigenen Zuges darauf; alle Fähigkeits-Bausteine; Ziel oder AOE; Effekte enden beim Verlassen oder nie). Umgehbar über den Effekt-Baustein „Gelände-Effekte ignorieren“.
+
+**Verborgenes Gelände** (z. B. Fallgruben) wird über verborgene Objekte gelöst. Der **Grundboden** eines Levels wird im Level-Editor festgelegt.
+
+**Umsetzung:**
+- `src/engine/terrain.ts` – Datenmodell, Begehbarkeit, Schachbrett-Farben, Kostensteigerung, Weiterrutschen (mit Tests)
+- `src/screens/editors/TerrainEditor.tsx` (mit Schachbrett-Vorschau); in der Liste zeigt jede Geländeart ihre Farben
 
 ### 10 – Level-Editor
 **Ziel:** Maps bauen und befüllen.

@@ -357,3 +357,7 @@ p { margin: 0 0 1em; line-height: 1.5; }
 /* ---------- Abschnitt 8: Objekte ---------- */
 .nested-editor { display: flex; flex-direction: column; gap: var(--gap); padding-left: 10px; border-left: 3px solid var(--accent); }
 .warn { color: var(--gold); }
+
+/* ---------- Abschnitt 9: Geländearten ---------- */
+.terrain-preview { display: grid; width: 100%; max-width: 240px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
+.terrain-preview span { aspect-ratio: 1; display: grid; place-items: center; }

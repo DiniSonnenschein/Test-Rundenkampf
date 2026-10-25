@@ -2,6 +2,7 @@ import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
 import { DEFAULT_OBJECT, normalizeObject } from '../engine/objects';
+import { DEFAULT_TERRAIN, normalizeTerrain } from '../engine/terrain';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
@@ -81,7 +82,16 @@ export const BAUSTEINE: CollectionDef[] = [
       return [o.collectible && 'Sammelbar', o.use.usable && 'Verwendbar', o.hidden && 'Verborgen'].filter(Boolean).join(' · ');
     },
   },
-  { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
+  {
+    key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9,
+    defaults: () => structuredClone(DEFAULT_TERRAIN) as unknown as Record<string, unknown>,
+    subtitle: (e) => {
+      const t = normalizeTerrain(e);
+      return [t.walkable === 'nein' ? 'Nicht begehbar' : t.walkable === 'bedingt' ? 'Bedingt begehbar' : '', t.slippery && 'Rutschig', t.light.on && 'Leuchtet']
+        .filter(Boolean)
+        .join(' · ');
+    },
+  },
   {
     key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5,
     defaults: () => structuredClone(DEFAULT_ABILITY) as unknown as Record<string, unknown>,

@@ -31,12 +31,18 @@ function makeTrigger(choice: TriggerChoice, prev: Trigger): Trigger {
   return { ...base, event: choice };
 }
 
-function WorkingFields({ w, set }: { w: ObjectWorking; set: (w: ObjectWorking) => void }) {
+/** Felder einer Wirkung (auch für Geländearten: dort nur Bereichs-Auslöser und kein „Ablegen“). */
+export function WorkingFields({ w, set, mode = 'objekt' }: { w: ObjectWorking; set: (w: ObjectWorking) => void; mode?: 'objekt' | 'gelaende' }) {
   const t = w.trigger;
+  const terrain = mode === 'gelaende';
   return (
     <>
       <span className="field-label">Wenn</span>
-      <Select<TriggerChoice> value={t.event} options={TRIGGER_OPTIONS} onChange={(c) => set({ ...w, trigger: makeTrigger(c, t) })} />
+      <Select<TriggerChoice>
+        value={t.event}
+        options={terrain ? TRIGGER_OPTIONS.slice(0, 4).map((o) => ({ ...o, label: o.label.replace('den Bereich', 'das Feld').replace('darin', 'darauf') })) : TRIGGER_OPTIONS}
+        onChange={(c) => set({ ...w, trigger: makeTrigger(c, t) })}
+      />
       {t.kind === 'bereich' && (
         <div className="indent">
           <Toggle label="Allys" checked={t.allys} onChange={(allys) => set({ ...w, trigger: { ...t, allys } })} />
@@ -47,7 +53,7 @@ function WorkingFields({ w, set }: { w: ObjectWorking; set: (w: ObjectWorking) =
           <MultiRefPicker collection="effekte" addLabel="Effekt" value={t.effectIds} onChange={(effectIds) => set({ ...w, trigger: { ...t, effectIds } })} />
         </div>
       )}
-      <span className="field-label">Bereich (vom Objekt aus, Blick nach oben)</span>
+      <span className="field-label">Bereich (vom {terrain ? 'Feld' : 'Objekt'} aus, Blick nach oben)</span>
       <AreaPicker value={w.area} onChange={(area) => set({ ...w, area })} />
       <span className="field-label">Ziel</span>
       <Choice<ObjectWorking['target']>
@@ -60,7 +66,7 @@ function WorkingFields({ w, set }: { w: ObjectWorking; set: (w: ObjectWorking) =
         value={w.ending}
         options={[
           { value: 'verlassen', label: 'Beim Verlassen des Bereichs' },
-          { value: 'ablegen', label: 'Beim Ablegen des Objekts' },
+          ...(terrain ? [] : [{ value: 'ablegen' as const, label: 'Beim Ablegen des Objekts' }]),
           { value: 'nie', label: 'Durch nichts davon' },
         ]}
         onChange={(ending) => set({ ...w, ending })}

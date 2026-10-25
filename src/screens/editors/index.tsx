@@ -7,6 +7,7 @@ import { CharacterEditor } from './CharacterEditor';
 import { EffectEditor } from './EffectEditor';
 import { GameEditor } from './GameEditor';
 import { ObjectEditor } from './ObjectEditor';
+import { TerrainEditor } from './TerrainEditor';
 import { ResourceEditor } from './ResourceEditor';
 import { RulesEditor } from './RulesEditor';
 
@@ -22,6 +23,7 @@ export const EDITORS: Record<string, ComponentType<EditorProps>> = {
   faehigkeiten: AbilityEditor,
   allys: CharacterEditor,
   objekte: ObjectEditor,
+  gelaende: TerrainEditor,
   gegner: (props) => (
     <>
       <CharacterEditor {...props} />
