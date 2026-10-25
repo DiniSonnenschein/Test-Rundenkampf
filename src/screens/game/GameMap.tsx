@@ -20,6 +20,8 @@ export interface Highlights {
   path?: Pos[];
   activeId?: string | null;
   selectedId?: string | null;
+  /** Figuren, die die Allys nicht wahrnehmen (unsichtbar und nicht aufgedeckt). */
+  hiddenIds?: Set<string>;
 }
 
 export function GameMap({
@@ -68,7 +70,17 @@ export function GameMap({
   const revealed = new Set(b.revealed ?? []);
   const objects = (b.objects ?? []).filter((o) => seen.has(posKey(o.pos)) && (!o.hidden || revealed.has(o.id)));
   // Allys sind immer sichtbar, Gegner nur auf gesehenen Feldern.
-  const units = b.units.filter((u) => u.pos && u.status !== 'entfernt' && (u.side === 'ally' || unitTiles(u).some((t) => seen.has(posKey(t)))));
+  const units = b.units.filter(
+    (u) => u.pos && u.status !== 'entfernt' && !u.carriedBy && !h.hiddenIds?.has(u.id) && (u.side === 'ally' || unitTiles(u).some((t) => seen.has(posKey(t)))),
+  );
+  // Verwandelte Figuren zeigen Form und Farbe der Vorlage, in die sie verwandelt sind.
+  const look = (u: (typeof units)[number]) => {
+    const t = u.transform;
+    const d = t
+      ? t.kind === 'objekt' ? defs.objects[t.id] : t.kind === 'ally' ? defs.allys[t.id] : defs.enemies[t.id]
+      : u.templateId ? defs.allys[u.templateId] ?? defs.enemies[u.templateId] : undefined;
+    return { shape: d?.shape ?? 'kreis', color: d?.color ?? '#888' };
+  };
   const rect = (p: Pos, cls: string) => <rect key={`${cls}-${posKey(p)}`} className={cls} x={p.x + 0.04} y={p.y + 0.04} width={0.92} height={0.92} rx={0.08} />;
 
   return (
@@ -83,8 +95,9 @@ export function GameMap({
         <polyline className="hl-path" points={h.path.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(' ')} />
       )}
       {units.map((u) => {
-        const d = u.templateId ? defs.allys[u.templateId] ?? defs.enemies[u.templateId] : undefined;
+        const d = look(u);
         const n = u.size ?? 1;
+        const carries = b.units.some((x) => x.carriedBy === u.id && x.status !== 'entfernt');
         const p = u.pos!;
         const rings = (u.effects ?? []).map((e) => defs.effects[e.effectId]).filter((e) => e?.display.show);
         const down = u.status === 'bewusstlos';
@@ -94,7 +107,8 @@ export function GameMap({
             {rings.map((e, i) => (
               <circle key={i} cx={p.x + n / 2} cy={p.y + n / 2} r={n * 0.47 - i * 0.06} fill="none" stroke={e!.display.color} strokeWidth={0.05} />
             ))}
-            <ShapeInSvg shape={d?.shape ?? 'kreis'} color={d?.color ?? '#888'} x={p.x + 0.12 * n} y={p.y + 0.12 * n} size={0.76 * n} />
+            <ShapeInSvg shape={d.shape} color={d.color} x={p.x + 0.12 * n} y={p.y + 0.12 * n} size={0.76 * n} />
+            {carries && <circle cx={p.x + 0.18} cy={p.y + n - 0.18} r={0.13} fill="#e8a33d" stroke="#000" strokeWidth={0.03} />}
             <polygon points={ARROW[u.facing ?? 'n']} transform={`translate(${p.x} ${p.y}) scale(${n})`} fill={u.side === 'ally' ? '#fff' : '#ffb4a0'} stroke="#000" strokeWidth={0.02} />
             {u.lantern && <ShapeInSvg shape="laterne" color="#f2c94c" x={p.x + n - 0.38} y={p.y - 0.02} size={0.36} />}
             {u.id === h.selectedId && <rect className="hl-selected" x={p.x} y={p.y} width={n} height={n} rx={0.12} />}

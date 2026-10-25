@@ -123,6 +123,8 @@ export interface ActiveEffect {
   roundsLeft?: number;
   /** Zähler je Beendigung „nach X …“ (Index → bisher gezählt). */
   counters: Record<number, number>;
+  /** Herkunft (Objekt-/Gelände-Wirkung): endet beim Verlassen des Bereichs bzw. Ablegen des Objekts. */
+  origin?: { kind: 'bereich'; key: string; tiles: string[] } | { kind: 'ablegen'; holderId: string; objectId: string };
 }
 
 export type EffectDefs = Record<string, EffectFields>;

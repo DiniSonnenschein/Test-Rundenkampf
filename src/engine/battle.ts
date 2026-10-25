@@ -53,6 +53,29 @@ export interface Unit {
   base?: { sightArea: Area; collision: boolean };
   /** Wer ihn zuletzt angegriffen hat (für die Gegner-KI). */
   lastAttackerId?: string;
+  /** Einmaliger Schutz (Fähigkeits-Baustein). */
+  shields?: Shield[];
+  /** Wird getragen von … (bewegt sich mit, belegt kein eigenes Feld). */
+  carriedBy?: string;
+  /** Getragene Objekte. */
+  carried?: { objectId: string; count: number }[];
+  /** Verwandelt (Effekt „Ziel verwandeln“): sieht aus wie / handelt wie diese Vorlage. */
+  transform?: { kind: 'ally' | 'gegner' | 'objekt'; id: string };
+  /** Genutzte Reaktionen (Index → Runde/Level der Zählung und Anzahl). */
+  reactionUses?: Record<number, { round: number; count: number }>;
+  /** Gegner: zuletzt gesehene Positionen der Allys. */
+  lastSeen?: Record<string, Pos>;
+  /** Gegner: Patrouille aus dem Level-Editor. */
+  patrol?: { points: Pos[]; mode: 'rundweg' | 'hin-zurueck'; index: number; forward: boolean };
+}
+
+export interface Shield {
+  id: string;
+  against: 'faehigkeit' | 'effekt' | 'ressource';
+  from: 'alle' | 'gegner' | 'allys' | 'typen';
+  typeIds: string[];
+  /** Verbleibende Runden (null = bis verbraucht). */
+  roundsLeft: number | null;
 }
 
 /** Objekt auf der Map während des Spiels. */
@@ -102,6 +125,8 @@ export interface BattleState {
   objects?: MapObject[];
   /** Aufgedeckte (verborgene) Objekte/Gegner. */
   revealed?: string[];
+  /** Bereichs-Auslöser: wer sich zuletzt in welchem Bereich befand (Schlüssel → IDs). */
+  areaMemory?: Record<string, string[]>;
 }
 
 /** Platzierung relativ zum Laternenträger, um sie ins nächste Level zu übernehmen. */
@@ -133,7 +158,7 @@ export function unitTiles(u: Unit, pos: Pos | null = u.pos): Pos[] {
   return tiles;
 }
 
-const occupies = (u: Unit, p: Pos) => u.status !== 'entfernt' && unitTiles(u).some((t) => samePos(t, p));
+const occupies = (u: Unit, p: Pos) => u.status !== 'entfernt' && !u.carriedBy && unitTiles(u).some((t) => samePos(t, p));
 
 /** Figur auf einem Feld (bevorzugt eine mit Kollision). */
 export const unitAt = (s: BattleState, p: Pos) =>

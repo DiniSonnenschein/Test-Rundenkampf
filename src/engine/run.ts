@@ -1,7 +1,7 @@
 // Ein laufendes Spiel (Run): Team, globale Ressourcen, aktuelles Level, Verlauf zum Rückgängigmachen.
 // Alles ist reines JSON und wird als Spielstand gespeichert.
 import {
-  checkOutcome, createBattle, currentUnit, endTurn, getUnit, placementSnapshot, startBattle, type BattleMap, type BattleState, type MapObject,
+  checkOutcome, createBattle, currentUnit, useAction, endTurn, getUnit, placementSnapshot, startBattle, type BattleMap, type BattleState, type MapObject,
   type Placement, type Unit,
 } from './battle';
 import { normalizeCharacter } from './characters';
@@ -13,6 +13,11 @@ import { posKey } from './grid';
 import { isVictory, terrainAt } from './level';
 import { INITIATIVE_ID } from './resources';
 import { refreshDerived, tickGlobals, tickUnit, type Ctx } from './status';
+import { aiStep } from './ai';
+import type { PendingReaction } from './events';
+import { executeAbility, type ExecOptions } from './execute';
+import type { Pos } from './grid';
+import { aiControlled, areaPass, levelStartTriggers, markReactionUsed, processEvents, turnWorkings } from './triggers';
 
 export interface TeamState {
   memberId: string;
@@ -52,6 +57,10 @@ export interface RunState {
   result?: 'level-gewonnen' | 'run-gewonnen' | 'run-verloren';
   /** Nach einem Dungeon-Level: Folgestationen zur Auswahl. */
   choices?: string[];
+  /** Ausgelöste Reaktionen von Allys, die auf eine Entscheidung warten. */
+  pending?: PendingReaction[];
+  /** „Startet damit ins Spiel“ wurde bereits ausgelöst. */
+  gameStarted?: boolean;
 }
 
 const MAX_HISTORY = 60;
@@ -168,6 +177,7 @@ function setupLevel(run: RunState): RunState {
         maxValues: Object.fromEntries(d.resources.map((r) => [r.resourceId, r.hasMax ? r.max : null])),
         items: [],
         effects: [],
+        patrol: e.patrol.points.length ? { ...e.patrol, index: 0, forward: true } : undefined,
       };
     });
   let battle = createBattle({
@@ -241,11 +251,12 @@ function applyStartEffect(ctx: Ctx, unitId: string, effectId: string, duration: 
 
 // ---------- Ablauf ----------
 
-export const toCtx = (run: RunState): Ctx => ({ defs: run.defs, battle: run.battle, globals: run.globals, log: run.log });
+export const toCtx = (run: RunState): Ctx => ({ defs: run.defs, battle: run.battle, globals: run.globals, log: run.log, pending: run.pending ?? [] });
 
 /** Übernimmt einen veränderten Kontext und prüft Sieg/Niederlage. */
 export function fromCtx(run: RunState, ctx: Ctx): RunState {
-  let next: RunState = { ...run, battle: ctx.battle, globals: ctx.globals, log: ctx.log };
+  if (run.battle.phase === 'kampf') ctx = processEvents(ctx);
+  let next: RunState = { ...run, battle: ctx.battle, globals: ctx.globals, log: ctx.log, pending: ctx.pending ?? [] };
   next = { ...next, battle: checkOutcome(refreshMap(next)) };
   if (ctx.result === 'niederlage' || next.battle.phase === 'niederlage') {
     return { ...next, result: 'run-verloren', log: [...next.log, `Run verloren${next.battle.outcome ? `: ${next.battle.outcome}` : '.'}`] };
@@ -257,7 +268,10 @@ export function fromCtx(run: RunState, ctx: Ctx): RunState {
 
 /** Zeitpunkt für alle bzw. einen Charakter und die globalen Ressourcen. */
 function tick(ctx: Ctx, event: TickEvent, unitId?: string): Ctx {
-  if (unitId) return tickUnit(ctx, unitId, event);
+  if (unitId) {
+    ctx = tickUnit(ctx, unitId, event);
+    return event.unit === 'zug' ? turnWorkings(ctx, unitId, event.timing) : ctx;
+  }
   for (const u of ctx.battle.units) if (u.status !== 'entfernt') ctx = tickUnit(ctx, u.id, event);
   return tickGlobals(ctx, event);
 }
@@ -266,11 +280,18 @@ function tick(ctx: Ctx, event: TickEvent, unitId?: string): Ctx {
 export function beginCombat(run: RunState): RunState {
   let ctx = toCtx(run);
   ctx = { ...ctx, battle: startBattle(ctx.battle), log: [...ctx.log, 'Runde 1'] };
+  ctx = areaPass(ctx, false);
+  const level = run.levelId ? run.defs.levels[run.levelId] : undefined;
+  ctx = levelStartTriggers(ctx, !run.gameStarted, {
+    enemies: (level?.enemies ?? []).map((e) => e.enemyId ?? ''),
+    objects: (level?.objects ?? []).map((o) => o.objectId ?? ''),
+    allys: run.team.map((m) => m.allyId),
+  });
   ctx = tick(ctx, { unit: 'level', timing: 'beginn' });
   ctx = tick(ctx, { unit: 'runde', timing: 'beginn' });
   const first = currentUnit(ctx.battle);
   if (first) ctx = tick(ctx, { unit: 'zug', timing: 'beginn' }, first.id);
-  const next = fromCtx({ ...run, placement: placementSnapshot(run.battle) }, ctx);
+  const next = fromCtx({ ...run, placement: placementSnapshot(run.battle), gameStarted: true }, { ...ctx, battle: { ...ctx.battle, phase: 'kampf' } });
   return recordIfAllyTurn(next);
 }
 
@@ -297,7 +318,7 @@ function snapshot(run: RunState): Snapshot {
 }
 
 function recordIfAllyTurn(run: RunState): RunState {
-  if (run.result || currentUnit(run.battle)?.side !== 'ally') return run;
+  if (run.result || !isAllyTurn(run)) return run;
   return { ...run, history: [...run.history, snapshot(run)].slice(-MAX_HISTORY) };
 }
 
@@ -362,6 +383,38 @@ export function restartLevel(run: RunState): RunState {
   return { ...run, battle: first.battle, globals: first.globals, log: [...run.log.slice(0, first.logLength), '↺ Level neu gestartet'], history: [first], result: undefined, choices: undefined };
 }
 
-export const isAllyTurn = (run: RunState) => !run.result && run.battle.phase === 'kampf' && currentUnit(run.battle)?.side === 'ally';
+/** Ist ein vom Spieler gesteuerter Ally am Zug? (Allys mit Verhaltens-Effekt steuert die KI.) */
+export const isAllyTurn = (run: RunState) => {
+  const u = currentUnit(run.battle);
+  return !run.result && run.battle.phase === 'kampf' && u?.side === 'ally' && !aiControlled(toCtx(run), u);
+};
+
+/** Führt eine Fähigkeit aus der Oberfläche heraus aus (Aktion wird verbraucht). */
+export function performAbility(run: RunState, action: number, abilityId: string, targets: Pos[], opts: ExecOptions = {}): RunState {
+  const unit = currentUnit(run.battle);
+  if (!unit) return run;
+  const next: RunState = { ...run, battle: useAction(run.battle, action, abilityId) };
+  return fromCtx(next, executeAbility(toCtx(next), unit.id, abilityId, targets, opts));
+}
+
+/** Eine ausgelöste Reaktion nutzen (abilityId) oder überspringen (null). */
+export function resolveReaction(run: RunState, abilityId: string | null, targets: Pos[] = [], opts: ExecOptions = {}): RunState {
+  const [p, ...rest] = run.pending ?? [];
+  if (!p) return run;
+  let ctx: Ctx = { ...toCtx(run), pending: rest };
+  if (abilityId) {
+    ctx = markReactionUsed(ctx, p.unitId, p.reaction);
+    ctx = executeAbility(ctx, p.unitId, abilityId, targets, { ...opts, reaction: { sourceId: p.sourceId, targetIds: p.targetIds } });
+  }
+  return fromCtx(run, ctx);
+}
+
+/** Ein KI-Schritt; null = Zug ist zu Ende. */
+export function aiTurnStep(run: RunState): RunState | null {
+  if (run.result || run.battle.phase !== 'kampf') return null;
+  if (run.pending?.length) return run; // erst die Reaktionen der Allys abwarten
+  const ctx = aiStep(toCtx(run));
+  return ctx ? fromCtx(run, ctx) : null;
+}
 export const victoryTile = (run: RunState, x: number, y: number) => !!run.levelId && isVictory(run.defs.levels[run.levelId], { x, y });
 export const initiativeOf = (u: Unit) => u.values?.[INITIATIVE_ID] ?? 0;

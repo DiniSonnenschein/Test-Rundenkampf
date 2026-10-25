@@ -85,7 +85,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 10 | Level-Editor | ✅ |
 | 11 | Dungeon-Editor | ✅ |
 | 12 | Neues Spiel (Setup) | ✅ |
-| 13 | Spielmodus (Kampf-Oberfläche) | 🟦 13a fertig, 13b/13c offen |
+| 13 | Spielmodus (Kampf-Oberfläche) | 🟦 13a+13b fertig, 13c offen |
 | 14 | Speichern & Laden | ⬜ |
 | 15 | Balancing-Werkzeuge | ⬜ |
 | 16 | Import / Export & Datenaustausch | ⬜ |
@@ -533,7 +533,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 ### 13 – Spielmodus (Kampf-Oberfläche)
 **Ziel:** Alles spielbar machen. Umsetzung in drei Teilen:
 - **13a ✅** Spiel starten, Platzierung, Runden & Züge, Aktionen-Ring, Zielwahl, Bausteine Ressource/Effekt/Anwender bewegen/Ziel bewegen/Blickrichtung, Ressourcen-Events, Effekte (Dauer, dauerhafte Werte, Bewusstlos, Aussetzen, Sicht, Kollision), Nebel, Sieg/Niederlage, Rückgängig, Log
-- **13b** alle übrigen Bausteine, Effekt-Auslöser und -Beendigungen, Reaktionen, Objekt- und Gelände-Wirkungen, Gegner-KI
+- **13b ✅** alle übrigen Bausteine, Effekt-Auslöser und -Beendigungen, Reaktionen, Objekt- und Gelände-Wirkungen, Gegner-KI
 - **13c** Dungeon-Ablauf mit Zwischenstationen (inkl. Händler), „Level testen“
 
 **Bedienung (festgelegt):**
@@ -545,18 +545,32 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - **Zielwahl:** Reichweite und legale Ziele werden hervorgehoben; Ziele antippen; **Bestätigen** ist möglich, sobald die Mindestzahl erreicht ist (bei max. 1 Ziel sofort – außer bei Bewegung: dort erst Wegvorschau, dann Bestätigen). Kosten (inkl. Steigerung) werden angezeigt. AOE und Zufall ohne Zielwahl.
 - **Zwang-Fähigkeiten** starten zu Beginn des Zuges sofort (nur Zielwahl, kein Abbrechen).
 - **Legale Ziele** „Allys“/„Gegner“ gelten aus Sicht des Anwenders.
-- **Gegnerzüge** mit kurzer Pause (Knopf „Überspringen“); unsichtbare ohne Animation. *(KI folgt in 13b – bis dahin warten Gegner.)*
+- **Gegnerzüge** Schritt für Schritt mit kurzer Pause (Knopf „Überspringen“). Allys mit Verhaltens-Effekt handeln ebenfalls selbstständig.
 - **Antippen einer Figur** zeigt Ressourcen-Balken, Effekte und Rucksack.
 - **Nebel:** nie gesehen = schwarz, erkundet = abgedunkelt (ohne Gegner), sichtbar = normal.
 - **Zug zurück** (↶) jederzeit; zurück an den Beginn des eigenen Zuges bzw. des vorherigen.
 - **Kampf-Log** (📜) mit allen Veränderungen.
 - **Ende:** Run verloren → Zug zurück / Level neu starten / Menü · Level geschafft → Weiter (bei Verzweigung Auswahl) · Run gewonnen → Zug zurück / Level noch einmal / Menü.
-- **Reaktionen** (13b): erscheinen wie Aktionen als Schalter am Charakter; mit ✕ überspringen; bei Zwang-Fähigkeiten direkt die Zielwahl.
+- **Reaktionen:** erscheinen als Ring (⚡) am reagierenden Ally, die Kamera springt hin; mit ✕ überspringen (verbraucht die Reaktion nicht); bei Zwang-Fähigkeiten direkt die Zielwahl. Solange eine Reaktion offen ist, wartet die KI. Gegner reagieren nur über Regeln mit „Als Reaktion“.
+- **Gegenstände:** Passen bei „Objekt verwenden/geben/werfen“ bzw. „Platzieren aus dem Rucksack“ mehrere Gegenstände, wird gefragt, welcher.
+- **Darstellung:** Verwandelte Figuren zeigen Form und Farbe ihrer neuen Gestalt; wer jemanden trägt, bekommt einen kleinen Punkt; unsichtbare Gegner bleiben verborgen, bis sie aufgedeckt werden. Die Info-Anzeige nennt Getragenes und Verwandlungen.
 
-**Umsetzung (13a):**
-- `src/engine/status.ts` – Ressourcen, Events, Effekte und Zeitpunkte im Kampf
-- `src/engine/execute.ts` – Reichweite, legale Ziele, Bedingungen, Kosten, Hindernisse, Bausteine
-- `src/engine/run.ts` – Spielablauf, Levelwechsel, Rückgängig (mit Tests)
+**KI (festgelegt in Abschnitt 8, umgesetzt in 13b):**
+- Kein Zufall: gleiche Lage → gleiches Handeln.
+- Wahrnehmung: eigenes Sichtfeld; steht der Gegner im Licht, sieht er alles Beleuchtete. Gesehene Allys werden gemerkt (für „letzte bekannte Position“).
+- Hauptziel nach der Prioritätenliste (nur erreichbare); „bis ungültig“ behält es, solange es wahrgenommen wird und nicht bewusstlos ist.
+- Regeln von oben nach unten: die erste passende wird ausgeführt, dann von vorne geprüft, bis keine mehr passt. Ohne Regeln: Hauptziel angreifen, sonst darauf zu laufen.
+- Ohne Hauptziel: Patrouille (Wegpunkte, Rundweg oder hin & zurück), letzte bekannte Position, zum Licht oder stehen bleiben.
+- **Bewegungsziele dürfen außerhalb der Sicht liegen** – die KI kennt die Karte (Hindernisse gelten weiterhin).
+- Verhaltens-Effekt (z. B. Flucht): Die Figur bewegt sich nur noch nach der Vorgabe des Effekts.
+- Sicherung: höchstens 40 KI-Schritte pro Zug.
+
+**Umsetzung (13a + 13b):**
+- `src/engine/status.ts` – Ressourcen, Events, Effekte, Schutz, Zeitpunkte im Kampf
+- `src/engine/execute.ts` – Reichweite, legale Ziele, Wahrnehmung, Bedingungen, Kosten, Hindernisse, alle Bausteine
+- `src/engine/events.ts`, `src/engine/triggers.ts` – Ereignisse, Effekt-Auslöser/-Beendigungen (inkl. Bereiche), Reaktionen, Objekt- und Gelände-Wirkungen (mit Tests)
+- `src/engine/ai.ts` – Gegner-KI (mit Tests)
+- `src/engine/run.ts` – Spielablauf, Levelwechsel, Rückgängig, Reaktionen, KI-Schritte (mit Tests)
 - `src/game/snapshot.ts`, `src/screens/game/GameScreen.tsx`, `src/screens/game/GameMap.tsx`, `src/ui/usePanZoom.ts`
 
 ### 14 – Speichern & Laden

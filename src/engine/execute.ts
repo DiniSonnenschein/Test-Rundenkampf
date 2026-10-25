@@ -1,25 +1,37 @@
 // Fähigkeiten im Kampf: Reichweite, legale Ziele, Bedingungen, Kosten und Ausführung der Bausteine.
 import { canPay, resourceCosts, traceProjectile, type AbilityBlock, type AbilityFields } from './abilities';
-import {
-  facingOf, getUnit, gridOf, onTargeted, unitTiles, visible, type BattleState, type MapObject, type Unit,
-} from './battle';
+import { facingOf, getUnit, onTargeted, unitTiles, visible, type BattleState, type MapObject, type Unit } from './battle';
 import { titleOf } from './defs';
+import { hasBlock, type Selection } from './effects';
 import { areaTiles, facingFromStep, facingTowards, type Facing } from './facing';
-import { distance, inBounds, neighbors, posKey, samePos, type Pos } from './grid';
-import { changeGlobal, changeResource, endEffects, giveEffect, valueOf, type Ctx } from './status';
+import { distance, inBounds, neighbors, posKey, samePos, type Grid, type Pos } from './grid';
+import { slotsNeeded } from './objects';
 import { totalAdjustment } from './resources';
-import { slide, terrainCosts } from './terrain';
+import {
+  changeGlobal, changeResource, consumeShield, destroyUnit, effectDefs, emit, endEffects, giveEffect, replaceUnit, valueOf, type Ctx, type Source,
+} from './status';
+import { canWalk, slide, terrainCosts } from './terrain';
 
 const uniq = (tiles: Pos[]) => [...new Map(tiles.map((t) => [posKey(t), t])).values()];
+let seq = 0;
+const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
 
-const isVoidTile = (b: BattleState, p: Pos) => !inBounds(b.map, p) || (b.map.voids ?? []).includes(posKey(p));
+export const isVoidTile = (b: BattleState, p: Pos) => !inBounds(b.map, p) || (b.map.voids ?? []).includes(posKey(p));
 
-export const unitsAt = (b: BattleState, p: Pos) => b.units.filter((u) => u.status !== 'entfernt' && unitTiles(u).some((t) => samePos(t, p)));
+export const unitsAt = (b: BattleState, p: Pos) =>
+  b.units.filter((u) => u.status !== 'entfernt' && !u.carriedBy && unitTiles(u).some((t) => samePos(t, p)));
 export const objectsAt = (b: BattleState, p: Pos) => (b.objects ?? []).filter((o) => samePos(o.pos, p));
 export const terrainOf = (ctx: Ctx, p: Pos) => {
   const id = ctx.battle.terrain?.[posKey(p)];
   return id ? ctx.defs.terrains[id] : undefined;
 };
+
+function setUnits(ctx: Ctx, fn: (u: Unit) => Unit): Ctx {
+  return { ...ctx, battle: { ...ctx.battle, units: ctx.battle.units.map(fn) } };
+}
+const log = (ctx: Ctx, line: string): Ctx => ({ ...ctx, log: [...ctx.log, line] });
+
+const selects = (sel: Selection, id: string | undefined, typeIds: string[]) => sel.all || (!!id && sel.ids.includes(id)) || typeIds.some((t) => sel.typeIds.includes(t));
 
 /** Felder in Reichweite (von jedem belegten Feld aus, gedreht nach Blickrichtung). */
 export function rangeTiles(b: BattleState, caster: Unit, ability: AbilityFields): Pos[] {
@@ -27,10 +39,25 @@ export function rangeTiles(b: BattleState, caster: Unit, ability: AbilityFields)
 }
 
 /** Ist ein Objekt für Allys sichtbar (nicht verborgen oder aufgedeckt)? */
-const objectVisible = (b: BattleState, o: MapObject) => !o.hidden || (b.revealed ?? []).includes(o.id);
+export const objectVisible = (b: BattleState, o: MapObject) => !o.hidden || (b.revealed ?? []).includes(o.id);
 
-function unitIsLegal(caster: Unit, u: Unit, a: AbilityFields): boolean {
+/** Nimmt viewer den Charakter target wahr? (Effekt „Nicht wahrnehmbar“) */
+export function perceives(ctx: Ctx, viewer: Unit, target: Unit): boolean {
+  if (viewer.id === target.id) return true;
+  return !hasBlock(target.effects ?? [], 'unsichtbar', effectDefs(ctx.defs)).some((b) => selects(b.selection, viewer.templateId, viewer.typeIds ?? []));
+}
+
+/** Kontext einer Reaktion: wer gerade eine Fähigkeit ausführt bzw. Ziel wird. */
+export interface ReactionContext {
+  sourceId?: string;
+  targetIds?: string[];
+}
+
+function unitIsLegal(caster: Unit, u: Unit, a: AbilityFields, rc?: ReactionContext): boolean {
   const l = a.targeting.legal;
+  const typed = (rule: { on: boolean; typeIds: string[] }) => rule.on && (!rule.typeIds.length || (u.typeIds ?? []).some((t) => rule.typeIds.includes(t)));
+  if (l.ausfuehrend.on && rc?.sourceId === u.id && typed(l.ausfuehrend)) return true;
+  if (l.anvisiert.on && rc?.targetIds?.includes(u.id) && typed(l.anvisiert)) return true;
   const rule = u.side === caster.side ? l.allys : l.gegner;
   if (!rule.on) return false;
   if (rule.typeIds.length && !(u.typeIds ?? []).some((t) => rule.typeIds.includes(t))) return false;
@@ -46,9 +73,9 @@ function objectIsLegal(ctx: Ctx, o: MapObject, a: AbilityFields): boolean {
 }
 
 /** Getroffene Dinge auf einem Feld nach den Regeln für legale Ziele. */
-export function legalOnTile(ctx: Ctx, caster: Unit, a: AbilityFields, p: Pos, onlyVisible: boolean) {
+export function legalOnTile(ctx: Ctx, caster: Unit, a: AbilityFields, p: Pos, onlyVisible: boolean, rc?: ReactionContext) {
   const b = ctx.battle;
-  const units = unitsAt(b, p).filter((u) => unitIsLegal(caster, u, a));
+  const units = unitsAt(b, p).filter((u) => unitIsLegal(caster, u, a, rc) && (!onlyVisible || perceives(ctx, caster, u)));
   const objects = objectsAt(b, p).filter((o) => objectIsLegal(ctx, o, a) && (!onlyVisible || objectVisible(b, o)));
   const l = a.targeting.legal;
   const tid = b.terrain?.[posKey(p)];
@@ -59,16 +86,25 @@ export function legalOnTile(ctx: Ctx, caster: Unit, a: AbilityFields, p: Pos, on
 
 const hasAnything = (r: ReturnType<typeof legalOnTile>) => r.units.length > 0 || r.objects.length > 0 || r.tile;
 
-/** Felder, die als Ziel gewählt werden dürfen (für Allys nur sichtbare). */
-export function legalTargets(ctx: Ctx, casterId: string, a: AbilityFields): Pos[] {
+/** Was ein Charakter sieht: Allys teilen ihre Sicht; Gegner sehen ihr Sichtfeld und – im Licht – alles Beleuchtete. */
+export function perception(ctx: Ctx, viewer: Unit): Set<string> {
+  if (viewer.side === 'ally') return visible(ctx.battle);
+  const all = visible({ ...ctx.battle, units: ctx.battle.units.filter((u) => u.side === 'ally' && u.lantern) });
+  const own = new Set<string>();
+  for (const t of unitTiles(viewer)) {
+    own.add(posKey(t));
+    for (const p of areaTiles(t, viewer.sightArea ?? [], facingOf(viewer))) own.add(posKey(p));
+  }
+  const inLight = unitTiles(viewer).some((t) => all.has(posKey(t)));
+  return inLight ? new Set([...own, ...all]) : own;
+}
+
+/** Felder, die als Ziel gewählt werden dürfen (nur wahrgenommene). */
+export function legalTargets(ctx: Ctx, casterId: string, a: AbilityFields, rc?: ReactionContext): Pos[] {
   const caster = getUnit(ctx.battle, casterId);
   if (!caster) return [];
-  const seen = caster.side === 'ally' ? visible(ctx.battle) : null;
-  return rangeTiles(ctx.battle, caster, a).filter((p) => {
-    if (seen && !seen.has(posKey(p))) return false;
-    // Nicht wahrnehmbare Charaktere kann man nicht anvisieren (Abschnitt 13b), hier nur Sichtbarkeit.
-    return hasAnything(legalOnTile(ctx, caster, a, p, true));
-  });
+  const seen = perception(ctx, caster);
+  return rangeTiles(ctx.battle, caster, a).filter((p) => seen.has(posKey(p)) && hasAnything(legalOnTile(ctx, caster, a, p, true, rc)));
 }
 
 // ---------- Bedingungen & Kosten ----------
@@ -77,14 +113,13 @@ export function conditionsMet(ctx: Ctx, casterId: string, a: AbilityFields): boo
   const u = getUnit(ctx.battle, casterId);
   if (!u) return false;
   return a.conditions.every((c) => {
-    if (c.kind === 'gegenstand') return !c.objectId || (u.items ?? []).some((i) => i.objectId === c.objectId && i.count > 0);
+    if (c.kind === 'gegenstand') return !c.objectId || [...(u.items ?? []), ...(u.carried ?? [])].some((i) => i.objectId === c.objectId && i.count > 0);
     if (c.kind === 'ressource') {
       if (!c.resourceId) return true;
       const v = ctx.defs.resources[c.resourceId]?.scope === 'global' ? ctx.globals[c.resourceId] : valueOf(ctx.defs, u, c.resourceId);
       if (v === undefined) return false;
       return c.bound === 'min' ? v >= c.value : v <= c.value;
     }
-    // Etwas befindet sich im Bereich (vom Anwender aus).
     const tiles = uniq(unitTiles(u).flatMap((t) => areaTiles(t, c.area, facingOf(u))));
     const sel = c.selection;
     return tiles.some((p) => {
@@ -92,15 +127,9 @@ export function conditionsMet(ctx: Ctx, casterId: string, a: AbilityFields): boo
         const tid = ctx.battle.terrain?.[posKey(p)];
         return !!tid && (sel.all || sel.ids.includes(tid));
       }
-      if (c.entity === 'objekt') {
-        return objectsAt(ctx.battle, p).some(
-          (o) => sel.all || sel.ids.includes(o.objectId) || (ctx.defs.objects[o.objectId]?.typeIds ?? []).some((t) => sel.typeIds.includes(t)),
-        );
-      }
+      if (c.entity === 'objekt') return objectsAt(ctx.battle, p).some((o) => selects(sel, o.objectId, ctx.defs.objects[o.objectId]?.typeIds ?? []));
       const side = c.entity === 'ally' ? 'ally' : 'enemy';
-      return unitsAt(ctx.battle, p).some(
-        (x) => x.id !== u.id && x.side === side && (sel.all || sel.ids.includes(x.templateId ?? '') || (x.typeIds ?? []).some((t) => sel.typeIds.includes(t))),
-      );
+      return unitsAt(ctx.battle, p).some((x) => x.id !== u.id && x.side === side && selects(sel, x.templateId, x.typeIds ?? []));
     });
   });
 }
@@ -121,16 +150,53 @@ export function available(ctx: Ctx, casterId: string): Record<string, number> {
   return { ...ctx.globals, ...own };
 }
 
+const itemFits = (ctx: Ctx, sel: Selection, objectId: string) =>
+  sel.all || sel.ids.includes(objectId) || (ctx.defs.objects[objectId]?.typeIds ?? []).some((t) => sel.typeIds.includes(t));
+
 export function affordable(ctx: Ctx, casterId: string, a: AbilityFields, targets: Pos[] = []): boolean {
+  const u = getUnit(ctx.battle, casterId)!;
   const objectCostsOk = a.costs.every((c) => {
     if (c.kind !== 'objekt') return true;
-    const u = getUnit(ctx.battle, casterId)!;
-    const matches = (u.items ?? []).filter(
-      (i) => c.selection.ids.includes(i.objectId) || (ctx.defs.objects[i.objectId]?.typeIds ?? []).some((t) => c.selection.typeIds.includes(t)),
-    );
-    return matches.reduce((s, i) => s + i.count, 0) >= c.count;
+    return (u.items ?? []).filter((i) => itemFits(ctx, { ...c.selection, all: false }, i.objectId)).reduce((s, i) => s + i.count, 0) >= c.count;
   });
-  return objectCostsOk && canPay(costsFor(ctx, casterId, a, targets.length ? targets : []), available(ctx, casterId));
+  return objectCostsOk && canPay(costsFor(ctx, casterId, a, targets), available(ctx, casterId));
+}
+
+function removeItem(ctx: Ctx, unitId: string, objectId: string, count = 1): Ctx {
+  return setUnits(ctx, (x) => {
+    if (x.id !== unitId) return x;
+    let left = count;
+    const take = (list: { objectId: string; count: number }[] = []) =>
+      list
+        .map((i) => {
+          if (i.objectId !== objectId || left === 0) return i;
+          const n = Math.min(left, i.count);
+          left -= n;
+          return { ...i, count: i.count - n };
+        })
+        .filter((i) => i.count > 0);
+    const items = take(x.items);
+    return { ...x, items, carried: take(x.carried) };
+  });
+}
+
+/** Gegenstand bekommen: in den Rucksack, wenn Platz ist, sonst wird er getragen. */
+function addItem(ctx: Ctx, unitId: string, objectId: string, count = 1): Ctx {
+  const u = getUnit(ctx.battle, unitId);
+  if (!u) return ctx;
+  const tpl = u.templateId ? ctx.defs.allys[u.templateId] ?? ctx.defs.enemies[u.templateId] : undefined;
+  const slots = tpl?.backpackSlots ?? 0;
+  const items = [...(u.items ?? [])];
+  const existing = items.find((i) => i.objectId === objectId);
+  const next = existing ? items.map((i) => (i === existing ? { ...i, count: i.count + count } : i)) : [...items, { objectId, count }];
+  const used = next.reduce((s, i) => s + slotsNeeded(ctx.defs.objects[i.objectId] ?? { stack: { stackable: false, max: 1 } }, i.count), 0);
+  if (used <= slots) return setUnits(ctx, (x) => (x.id === unitId ? { ...x, items: next } : x));
+  const carried = [...(u.carried ?? [])];
+  const c = carried.find((i) => i.objectId === objectId);
+  return log(
+    setUnits(ctx, (x) => (x.id === unitId ? { ...x, carried: c ? carried.map((i) => (i === c ? { ...i, count: i.count + count } : i)) : [...carried, { objectId, count }] } : x)),
+    `${u.name}: Rucksack voll – ${titleOf(ctx.defs, objectId)} wird getragen.`,
+  );
 }
 
 function pay(ctx: Ctx, casterId: string, a: AbilityFields, targets: Pos[]): Ctx {
@@ -139,19 +205,15 @@ function pay(ctx: Ctx, casterId: string, a: AbilityFields, targets: Pos[]): Ctx 
     if (ctx.defs.resources[id]?.scope === 'global') ctx = changeGlobal(ctx, id, -amount, false);
     else ctx = changeResource(ctx, casterId, id, -amount, false);
   }
-  // Objekte verbrauchen.
   for (const c of a.costs) {
     if (c.kind !== 'objekt') continue;
     let left = c.count;
-    const u = getUnit(ctx.battle, casterId)!;
-    const items = (u.items ?? []).map((i) => {
-      const fits = c.selection.ids.includes(i.objectId) || (ctx.defs.objects[i.objectId]?.typeIds ?? []).some((t) => c.selection.typeIds.includes(t));
-      if (!fits || left === 0) return i;
-      const take = Math.min(left, i.count);
-      left -= take;
-      return { ...i, count: i.count - take };
-    });
-    ctx = { ...ctx, battle: { ...ctx.battle, units: ctx.battle.units.map((x) => (x.id === casterId ? { ...x, items: items.filter((i) => i.count > 0) } : x)) } };
+    for (const i of getUnit(ctx.battle, casterId)?.items ?? []) {
+      if (left === 0 || !itemFits(ctx, { ...c.selection, all: false }, i.objectId)) continue;
+      const n = Math.min(left, i.count);
+      left -= n;
+      ctx = removeItem(ctx, casterId, i.objectId, n);
+    }
   }
   return ctx;
 }
@@ -160,34 +222,41 @@ function pay(ctx: Ctx, casterId: string, a: AbilityFields, targets: Pos[]): Ctx 
 
 /** Hindernis für Fähigkeiten: Gelände-Hindernis, Objekt bzw. Charakter mit Kollision. */
 function isObstacle(ctx: Ctx, p: Pos, ignore: string[]): boolean {
-  const b = ctx.battle;
   if (terrainOf(ctx, p)?.obstacle) return true;
-  if (objectsAt(b, p).some((o) => ctx.defs.objects[o.objectId]?.collision)) return true;
-  return unitsAt(b, p).some((u) => !ignore.includes(u.id) && u.collision !== false);
+  if (objectsAt(ctx.battle, p).some((o) => ctx.defs.objects[o.objectId]?.collision)) return true;
+  return unitsAt(ctx.battle, p).some((u) => !ignore.includes(u.id) && u.collision !== false);
 }
 
-/** Kann eine Figur auf diesem Feld stehen (begehbar, frei)? */
+/** Kann eine Figur auf diesem Feld stehen? (Gelände, Objekte und Figuren mit Kollision; „Hindernisse ignorieren“.) */
 export function canEnter(ctx: Ctx, u: Unit, pos: Pos): boolean {
-  const g = gridOf(ctx.battle.map);
-  return unitTiles(u, pos).every(
-    (t) =>
-      g.isPassable(t) &&
-      (u.collision === false || !ctx.battle.units.some((x) => x.id !== u.id && x.collision !== false && x.status !== 'entfernt' && unitTiles(x).some((y) => samePos(y, t)))),
-  );
+  const ignores = hasBlock(u.effects ?? [], 'hindernis-ignorieren', effectDefs(ctx.defs));
+  const ignored = (cat: string, id: string | undefined, types: string[]) => ignores.some((b) => b.category === cat && selects(b.selection, id, types));
+  const effects = (u.effects ?? []).map((e) => e.effectId);
+  return unitTiles(u, pos).every((t) => {
+    if (isVoidTile(ctx.battle, t)) return false;
+    const tid = ctx.battle.terrain?.[posKey(t)];
+    const terrain = tid ? ctx.defs.terrains[tid] : undefined;
+    if (terrain && !canWalk(terrain, u.typeIds ?? [], effects) && !ignored('gelaende', tid, [])) return false;
+    if (u.collision === false) return true;
+    if (objectsAt(ctx.battle, t).some((o) => ctx.defs.objects[o.objectId]?.collision && !ignored('objekt', o.objectId, ctx.defs.objects[o.objectId]?.typeIds ?? []))) return false;
+    return !unitsAt(ctx.battle, t).some(
+      (x) => x.id !== u.id && x.collision !== false && !ignored(x.side === 'ally' ? 'ally' : 'gegner', x.templateId, x.typeIds ?? []),
+    );
+  });
 }
 
 /** Kürzester Weg (Liste der Felder ohne Start) oder null. */
-export function findPath(ctx: Ctx, u: Unit, to: Pos): Pos[] | null {
+export function findPath(ctx: Ctx, u: Unit, to: Pos, maxSteps = 400): Pos[] | null {
   if (!u.pos) return null;
-  const g = gridOf(ctx.battle.map);
+  const g: Grid = { width: ctx.battle.map.width, height: ctx.battle.map.height, isPassable: (p) => canEnter(ctx, u, p), blocksSight: () => false };
   const rules = { diagonal: ctx.battle.rules.diagonal, cornerCutting: ctx.battle.rules.cornerCutting };
   const prev = new Map<string, Pos | null>([[posKey(u.pos), null]]);
   const queue = [u.pos];
-  while (queue.length) {
+  while (queue.length && prev.size < maxSteps * 40) {
     const p = queue.shift()!;
     if (samePos(p, to)) break;
     for (const n of neighbors(g, p, rules)) {
-      if (prev.has(posKey(n)) || !canEnter(ctx, u, n)) continue;
+      if (prev.has(posKey(n))) continue;
       prev.set(posKey(n), p);
       queue.push(n);
     }
@@ -198,14 +267,11 @@ export function findPath(ctx: Ctx, u: Unit, to: Pos): Pos[] | null {
   return path;
 }
 
-function placeUnitAt(ctx: Ctx, unitId: string, pos: Pos, facing?: Facing): Ctx {
-  return { ...ctx, battle: { ...ctx.battle, units: ctx.battle.units.map((x) => (x.id === unitId ? { ...x, pos, facing: facing ?? x.facing } : x)) } };
-}
-
-/** Bewegung über einen Weg (bzw. Sprung) inkl. Weiterrutschen auf rutschigem Gelände. */
+/** Bewegung über einen Weg (bzw. Sprung) inkl. Weiterrutschen; Getragenes bewegt sich mit. */
 export function moveAlong(ctx: Ctx, unitId: string, path: Pos[]): Ctx {
   const u = getUnit(ctx.battle, unitId);
   if (!u?.pos || !path.length) return ctx;
+  const start = u.pos;
   let from = path.length > 1 ? path[path.length - 2] : u.pos;
   let to = path[path.length - 1];
   const extra = slide(
@@ -219,20 +285,29 @@ export function moveAlong(ctx: Ctx, unitId: string, path: Pos[]): Ctx {
     from = extra.length > 1 ? extra[extra.length - 2] : to;
     to = extra[extra.length - 1];
   }
-  ctx = placeUnitAt(ctx, unitId, to, facingFromStep(from, to, facingOf(u)));
-  return { ...ctx, log: [...ctx.log, `${u.name} bewegt sich${extra.length ? ` und rutscht ${extra.length} Feld${extra.length === 1 ? '' : 'er'} weiter` : ''}.`] };
+  const facing = facingFromStep(from, to, facingOf(u));
+  ctx = setUnits(ctx, (x) => (x.id === unitId ? { ...x, pos: to, facing } : x.carriedBy === unitId ? { ...x, pos: to } : x));
+  ctx = log(ctx, `${u.name} bewegt sich${extra.length ? ` und rutscht ${extra.length} Feld${extra.length === 1 ? '' : 'er'} weiter` : ''}.`);
+  // Ereignisse Feld für Feld (für Bereichs- und Gelände-Auslöser).
+  const steps = [...path, ...extra];
+  let prev = start;
+  for (const s of steps) {
+    ctx = emit(ctx, { kind: 'move', unitId, from: prev, to: s });
+    prev = s;
+  }
+  return ctx;
 }
 
 // ---------- Ausführung ----------
 
-interface Hit {
+export interface Hit {
   units: Unit[];
   objects: MapObject[];
   tiles: Pos[];
 }
 
 /** Löst Ziele inkl. Hindernis-Verhalten und Radius in getroffene Dinge auf. Null = Fähigkeit bricht ab. */
-function resolveHits(ctx: Ctx, caster: Unit, a: AbilityFields, targets: Pos[]): Hit | null {
+function resolveHits(ctx: Ctx, caster: Unit, a: AbilityFields, targets: Pos[], rc?: ReactionContext): Hit | null {
   const t = a.targeting;
   const hitTiles: Pos[] = [];
   for (const target of targets) {
@@ -247,7 +322,7 @@ function resolveHits(ctx: Ctx, caster: Unit, a: AbilityFields, targets: Pos[]): 
       caster.pos,
       target,
       (p) => !samePos(p, target) && isObstacle(ctx, p, ignore),
-      (p) => hasAnything(legalOnTile(ctx, caster, a, p, false)),
+      (p) => hasAnything(legalOnTile(ctx, caster, a, p, false, rc)),
       bounces,
     );
     if (r.outcome === 'ziel' && r.end) {
@@ -267,16 +342,46 @@ function resolveHits(ctx: Ctx, caster: Unit, a: AbilityFields, targets: Pos[]): 
   const all = uniq([...hitTiles, ...radius]);
   const hit: Hit = { units: [], objects: [], tiles: [] };
   for (const p of all) {
-    const r = legalOnTile(ctx, caster, a, p, false);
+    const r = legalOnTile(ctx, caster, a, p, false, rc);
     hit.units.push(...r.units.filter((u) => !hit.units.some((x) => x.id === u.id)));
     hit.objects.push(...r.objects.filter((o) => !hit.objects.some((x) => x.id === o.id)));
-    if (r.tile || r.units.length || r.objects.length) hit.tiles.push(p);
+    hit.tiles.push(p);
   }
   return hit;
 }
 
-function applyBlock(ctx: Ctx, casterId: string, abilityId: string, a: AbilityFields, b: AbilityBlock, hit: Hit, targets: Pos[]): Ctx {
-  const caster = getUnit(ctx.battle, casterId)!;
+export interface ExecOptions {
+  /** Gewählter Gegenstand für „Objekt verwenden/geben/werfen“ bzw. „Platzieren aus dem Rucksack“. */
+  objectId?: string;
+  /** Reaktions-Kontext (legale Ziele „führt gerade aus“/„wird gerade Ziel“). */
+  reaction?: ReactionContext;
+  /** Herkunft für vergebene Effekte (Objekt-/Gelände-Wirkungen). */
+  origin?: import('./effects').ActiveEffect['origin'];
+}
+
+/** Gegenstände eines Charakters, die zu einer Auswahl passen (Rucksack und Getragenes). */
+export function matchingItems(ctx: Ctx, u: Unit, sel: Selection): string[] {
+  return [...new Set([...(u.items ?? []), ...(u.carried ?? [])].filter((i) => i.count > 0 && itemFits(ctx, sel, i.objectId)).map((i) => i.objectId))];
+}
+
+/** Ein Objekt auf die Map legen (Kollision: nur, wenn frei – sonst daneben auf ein freies Feld). */
+function dropObject(ctx: Ctx, objectId: string, at: Pos): Ctx {
+  const d = ctx.defs.objects[objectId];
+  const free = (p: Pos) =>
+    !isVoidTile(ctx.battle, p) &&
+    (!d?.collision || (!objectsAt(ctx.battle, p).some((o) => ctx.defs.objects[o.objectId]?.collision) && !unitsAt(ctx.battle, p).some((u) => u.collision !== false)));
+  let pos: Pos | undefined = free(at) ? at : undefined;
+  for (let r = 1; !pos && r <= 3; r++) {
+    for (let dy = -r; dy <= r && !pos; dy++) for (let dx = -r; dx <= r && !pos; dx++) if (free({ x: at.x + dx, y: at.y + dy })) pos = { x: at.x + dx, y: at.y + dy };
+  }
+  if (!pos) return log(ctx, `${titleOf(ctx.defs, objectId)} findet keinen Platz.`);
+  return { ...ctx, battle: { ...ctx.battle, objects: [...(ctx.battle.objects ?? []), { id: uid('obj'), objectId, pos, hidden: false }] } };
+}
+
+/** Wendet einen Baustein an. caster kann auch ein Objekt bzw. Feld sein (Wirkungen). */
+export function applyBlock(ctx: Ctx, caster: Unit, abilityId: string, a: AbilityFields, b: AbilityBlock, hit: Hit, targets: Pos[], opts: ExecOptions = {}): Ctx {
+  const source: Source = { unitId: caster.id, side: caster.side, typeIds: a.typeIds, kind: 'faehigkeit' };
+  const self = getUnit(ctx.battle, caster.id);
   switch (b.kind) {
     case 'ressource':
       if (!b.resourceId) return ctx;
@@ -286,25 +391,47 @@ function applyBlock(ctx: Ctx, casterId: string, abilityId: string, a: AbilityFie
         const resAdj = ctx.defs.resources[b.resourceId]?.adjustments ?? [];
         const adj = totalAdjustment([...charAdj, ...resAdj], abilityId, a.typeIds);
         const amount = adj ? Math.sign(b.amount) * Math.max(0, Math.abs(b.amount) + adj) : b.amount;
-        ctx = changeResource(ctx, u.id, b.resourceId, amount, b.mayExceedMax);
+        ctx = changeResource(ctx, u.id, b.resourceId, amount, b.mayExceedMax, 0, u.id === caster.id ? undefined : source);
       }
       return ctx;
     case 'effekt':
       for (const u of hit.units) {
-        if (b.action === 'ausloesen' && b.effectId) ctx = giveEffect(ctx, u.id, b.effectId, b.duration, casterId);
+        if (b.action === 'ausloesen' && b.effectId) ctx = giveEffect(ctx, u.id, b.effectId, b.duration, caster.id, 0, opts.origin);
         if (b.action === 'beenden') {
           ctx = endEffects(ctx, u.id, (e) => e.effectId === b.effectId || (ctx.defs.effects[e.effectId]?.typeIds ?? []).some((t) => b.typeIds.includes(t)));
         }
       }
       return ctx;
+    case 'faehigkeit':
+      for (const u of hit.units) {
+        const has = u.actions.flatMap((x) => x.abilities.map((y) => y.abilityId)).filter((id): id is string => !!id);
+        const pick = has.find((id) => id === b.abilityId || (ctx.defs.abilities[id]?.typeIds ?? []).some((t) => b.typeIds.includes(t)));
+        if (b.action === 'unterbrechen') {
+          ctx = { ...ctx, pending: (ctx.pending ?? []).filter((p) => p.unitId !== u.id) };
+          ctx = log(ctx, `${u.name} wird unterbrochen.`);
+          continue;
+        }
+        if (!pick) continue;
+        const def = ctx.defs.abilities[pick];
+        const targetsFor = def.targeting.kind === 'ziel' ? legalTargets(ctx, u.id, def).slice(0, def.targeting.maxTargets) : [];
+        ctx = executeAbility(ctx, u.id, pick, targetsFor, { reaction: opts.reaction });
+      }
+      return ctx;
+    case 'schutz':
+      for (const u of hit.units) {
+        const shield = { id: uid('schutz'), against: b.against, from: b.from, typeIds: b.typeIds, roundsLeft: b.duration.kind === 'runden' ? b.duration.rounds : null };
+        ctx = setUnits(ctx, (x) => (x.id === u.id ? { ...x, shields: [...(x.shields ?? []), shield] } : x));
+        ctx = log(ctx, `${u.name} erhält einen Schutz.`);
+      }
+      return ctx;
     case 'anwender-bewegen': {
       const target = targets[0];
-      if (!target || !caster.pos) return ctx;
-      const allowed = b.area.length === 0 || areaTiles(caster.pos, b.area, 'n').some((p) => samePos(p, target));
-      if (!allowed) return { ...ctx, log: [...ctx.log, `${caster.name}: Zielfeld liegt außerhalb der möglichen Bewegung.`] };
-      if (b.ignoresObstacles) return canEnter(ctx, caster, target) ? moveAlong(ctx, casterId, [target]) : ctx;
-      const path = findPath(ctx, caster, target);
-      return path ? moveAlong(ctx, casterId, path) : { ...ctx, log: [...ctx.log, `${caster.name}: kein Weg dorthin.`] };
+      if (!target || !self?.pos) return ctx;
+      const allowed = b.area.length === 0 || areaTiles(self.pos, b.area, 'n').some((p) => samePos(p, target));
+      if (!allowed) return log(ctx, `${self.name}: Zielfeld liegt außerhalb der möglichen Bewegung.`);
+      if (b.ignoresObstacles) return canEnter(ctx, self, target) ? moveAlong(ctx, self.id, [target]) : ctx;
+      const path = findPath(ctx, self, target);
+      return path ? moveAlong(ctx, self.id, path) : log(ctx, `${self.name}: kein Weg dorthin.`);
     }
     case 'ziel-bewegen':
       for (const u of hit.units) {
@@ -332,6 +459,138 @@ function applyBlock(ctx: Ctx, casterId: string, abilityId: string, a: AbilityFie
         ctx = path.length ? moveAlong(ctx, u.id, path) : ctx;
       }
       return ctx;
+    case 'gelaende':
+      if (!b.terrainId) return ctx;
+      for (const p of hit.tiles) ctx = { ...ctx, battle: { ...ctx.battle, terrain: { ...(ctx.battle.terrain ?? {}), [posKey(p)]: b.terrainId } } };
+      return log(ctx, `Gelände wird zu ${titleOf(ctx.defs, b.terrainId)}.`);
+    case 'zerstoeren':
+      for (const u of hit.units.filter((x) => x.side === 'enemy')) ctx = destroyUnit(ctx, u.id);
+      if (hit.objects.length) {
+        const ids = new Set(hit.objects.map((o) => o.id));
+        ctx = log({ ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).filter((o) => !ids.has(o.id)) } }, `${hit.objects.map((o) => titleOf(ctx.defs, o.objectId)).join(', ')} zerstört.`);
+      }
+      return ctx;
+    case 'ersetzen':
+      if (!b.into.id) return ctx;
+      for (const u of hit.units.filter((x) => x.side === 'enemy')) ctx = replaceUnit(ctx, u.id, b.into.kind, b.into.id);
+      for (const o of hit.objects) {
+        if (b.into.kind === 'objekt') {
+          ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).map((x) => (x.id === o.id ? { ...x, objectId: b.into.id! } : x)) } };
+        } else {
+          ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).filter((x) => x.id !== o.id) } };
+          ctx = spawnEnemy(ctx, b.into.id!, o.pos);
+        }
+      }
+      return ctx;
+    case 'sammeln':
+      if (!self) return ctx;
+      for (const o of hit.objects) {
+        if (!ctx.defs.objects[o.objectId]?.collectible) {
+          ctx = log(ctx, `${titleOf(ctx.defs, o.objectId)} kann nicht gesammelt werden.`);
+          continue;
+        }
+        ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).filter((x) => x.id !== o.id) } };
+        ctx = addItem(ctx, self.id, o.objectId);
+        ctx = log(ctx, `${self.name} sammelt ${titleOf(ctx.defs, o.objectId)}.`);
+        ctx = emit(ctx, { kind: 'item', unitId: self.id, objectId: o.objectId, action: 'sammelt', at: o.pos });
+      }
+      return ctx;
+    case 'tragen':
+      if (!self) return ctx;
+      for (const u of hit.units.filter((x) => x.id !== self.id)) {
+        ctx = setUnits(ctx, (x) => (x.id === u.id ? { ...x, carriedBy: self.id, pos: self.pos } : x));
+        ctx = log(ctx, `${self.name} trägt ${u.name}.`);
+      }
+      for (const o of hit.objects) {
+        if (!ctx.defs.objects[o.objectId]?.carriable) continue;
+        ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).filter((x) => x.id !== o.id) } };
+        ctx = setUnits(ctx, (x) => (x.id === self.id ? { ...x, carried: [...(x.carried ?? []), { objectId: o.objectId, count: 1 }] } : x));
+        ctx = log(ctx, `${self.name} trägt ${titleOf(ctx.defs, o.objectId)}.`);
+      }
+      return ctx;
+    case 'platzieren': {
+      const target = targets[0];
+      if (!self?.pos || !target) return ctx;
+      if (b.area.length && !areaTiles(self.pos, b.area, 'n').some((p) => samePos(p, target))) return log(ctx, 'Zielort liegt außerhalb des Bereichs.');
+      if (b.what === 'getragenes') {
+        const unit = ctx.battle.units.find((x) => x.carriedBy === self.id);
+        if (unit) {
+          ctx = setUnits(ctx, (x) => (x.id === unit.id ? { ...x, carriedBy: undefined, pos: target } : x));
+          return emit(log(ctx, `${self.name} setzt ${unit.name} ab.`), { kind: 'move', unitId: unit.id, from: self.pos, to: target });
+        }
+        const item = self.carried?.[0];
+        if (!item) return log(ctx, `${self.name} trägt nichts.`);
+        ctx = removeItem(ctx, self.id, item.objectId);
+        ctx = dropObject(ctx, item.objectId, target);
+        return emit(ctx, { kind: 'item', unitId: self.id, objectId: item.objectId, action: 'platziert', at: target });
+      }
+      const objectId = opts.objectId ?? matchingItems(ctx, self, b.selection)[0];
+      if (!objectId) return log(ctx, `${self.name} hat keinen passenden Gegenstand.`);
+      ctx = removeItem(ctx, self.id, objectId);
+      ctx = dropObject(ctx, objectId, target);
+      return emit(log(ctx, `${self.name} platziert ${titleOf(ctx.defs, objectId)}.`), { kind: 'item', unitId: self.id, objectId, action: 'platziert', at: target });
+    }
+    case 'objekt-verwenden': {
+      if (!self) return ctx;
+      const objectId = opts.objectId ?? matchingItems(ctx, self, b.selection).find((id) => ctx.defs.objects[id]?.use.usable);
+      const d = objectId ? ctx.defs.objects[objectId] : undefined;
+      if (!objectId || !d?.use.usable) return log(ctx, `${self.name} hat nichts Verwendbares.`);
+      if (d.use.consumed) ctx = removeItem(ctx, self.id, objectId);
+      ctx = log(ctx, `${self.name} verwendet ${d.title}.`);
+      // Die Verwendung wirkt wie eine Fähigkeit; Ziele: das eigene Feld, wenn erlaubt, sonst die Ziele dieser Fähigkeit.
+      const useTargets = d.use.ability.targeting.range.includes('0,0') && self.pos ? [self.pos] : targets;
+      ctx = runAbility(ctx, self, `objekt:${objectId}`, { ...d.use.ability, title: d.title }, useTargets, opts, false);
+      return emit(ctx, { kind: 'item', unitId: self.id, objectId, action: 'verwendet' });
+    }
+    case 'objekt-geben': {
+      if (!self) return ctx;
+      const objectId = opts.objectId ?? matchingItems(ctx, self, b.selection)[0];
+      const receiver = hit.units.find((x) => x.id !== self.id);
+      if (!objectId || !receiver) return log(ctx, 'Nichts zu geben.');
+      ctx = removeItem(ctx, self.id, objectId);
+      ctx = addItem(ctx, receiver.id, objectId);
+      ctx = log(ctx, `${self.name} gibt ${titleOf(ctx.defs, objectId)} an ${receiver.name}.`);
+      return emit(ctx, { kind: 'item', unitId: self.id, objectId, action: 'vergeben' });
+    }
+    case 'objekt-werfen': {
+      if (!self?.pos) return ctx;
+      const objectId = opts.objectId ?? matchingItems(ctx, self, b.selection)[0];
+      const target = targets[0];
+      const d = objectId ? ctx.defs.objects[objectId] : undefined;
+      if (!objectId || !target || !d) return log(ctx, 'Nichts zu werfen.');
+      ctx = removeItem(ctx, self.id, objectId);
+      let at = target;
+      if (!d.throw.ignoresObstacles) {
+        const r = traceProjectile(ctx.battle.map, self.pos, target, (p) => !samePos(p, target) && isObstacle(ctx, p, [self.id]), () => false, 0);
+        if (r.outcome === 'hindernis' && r.path.length > 1) at = r.path[r.path.length - 2];
+      }
+      ctx = log(ctx, `${self.name} wirft ${d.title}.`);
+      if (d.throw.terrainId) ctx = { ...ctx, battle: { ...ctx.battle, terrain: { ...(ctx.battle.terrain ?? {}), [posKey(at)]: d.throw.terrainId } } };
+      if (d.throw.impact === 'liegen') ctx = dropObject(ctx, objectId, at);
+      if (d.throw.impact === 'verwandelt' && d.throw.into.id) {
+        if (d.throw.into.kind === 'objekt') ctx = dropObject(ctx, d.throw.into.id, at);
+        else ctx = spawnEnemy(ctx, d.throw.into.id, at);
+      }
+      return emit(ctx, { kind: 'item', unitId: self.id, objectId, action: 'geworfen', at });
+    }
+    case 'aufdecken': {
+      const tiles = new Set(hit.tiles.map(posKey));
+      const ids = [
+        ...(b.objekte.on
+          ? (ctx.battle.objects ?? [])
+              .filter((o) => tiles.has(posKey(o.pos)) && (!b.objekte.typeIds.length || (ctx.defs.objects[o.objectId]?.typeIds ?? []).some((t) => b.objekte.typeIds.includes(t))))
+              .map((o) => o.id)
+          : []),
+        ...(b.gegner.on
+          ? ctx.battle.units
+              .filter((u) => u.side === 'enemy' && u.pos && tiles.has(posKey(u.pos)) && (!b.gegner.typeIds.length || (u.typeIds ?? []).some((t) => b.gegner.typeIds.includes(t))))
+              .map((u) => u.id)
+          : []),
+        ...(b.showRange ? ['__bereiche__'] : []),
+      ];
+      if (!ids.length) return log(ctx, 'Nichts Verborgenes gefunden.');
+      return log({ ...ctx, battle: { ...ctx.battle, revealed: [...new Set([...(ctx.battle.revealed ?? []), ...ids])] } }, `${ids.filter((i) => i !== '__bereiche__').length} Verborgenes aufgedeckt.`);
+    }
     case 'blickrichtung': {
       const turn = (who: Unit, other: Unit | undefined, fixed: Facing) => {
         if (!who.pos) return who.facing;
@@ -341,42 +600,84 @@ function applyBlock(ctx: Ctx, casterId: string, abilityId: string, a: AbilityFie
         const opposite: Record<Facing, Facing> = { n: 's', s: 'n', o: 'w', w: 'o' };
         return b.mode === 'zu' ? toward : opposite[toward];
       };
-      const units = ctx.battle.units.map((x) => {
+      return setUnits(ctx, (x) => {
         if (b.who === 'ziel' && hit.units.some((h) => h.id === x.id)) return { ...x, facing: turn(x, caster, b.direction) };
-        if (b.who === 'anwender' && x.id === casterId) return { ...x, facing: turn(x, hit.units[0], b.direction) };
+        if (b.who === 'anwender' && x.id === caster.id) return { ...x, facing: turn(x, hit.units[0], b.direction) };
         return x;
       });
-      return { ...ctx, battle: { ...ctx.battle, units } };
     }
-    default:
-      return { ...ctx, log: [...ctx.log, `(Baustein „${b.kind}“ folgt in Abschnitt 13b.)`] };
   }
+}
+
+/** Neuen Gegner auf ein Feld setzen (z. B. durch Ersetzen/Werfen). */
+export function spawnEnemy(ctx: Ctx, enemyId: string, pos: Pos): Ctx {
+  const d = ctx.defs.enemies[enemyId];
+  if (!d) return ctx;
+  const id = uid('gegner');
+  const unit: Unit = {
+    id,
+    side: 'enemy',
+    status: 'aktiv',
+    name: d.title,
+    pos,
+    facing: 's',
+    templateId: enemyId,
+    actions: d.actions,
+    size: d.size,
+    collision: d.collision,
+    sightArea: d.sightArea,
+    base: { sightArea: d.sightArea, collision: d.collision },
+    typeIds: d.typeIds,
+    values: Object.fromEntries(d.resources.map((r) => [r.resourceId, r.start])),
+    maxValues: Object.fromEntries(d.resources.map((r) => [r.resourceId, r.hasMax ? r.max : null])),
+    items: [],
+    effects: [],
+  };
+  // Neue Gegner handeln ab der nächsten Runde (am Ende der Reihenfolge).
+  return log({ ...ctx, battle: { ...ctx.battle, units: [...ctx.battle.units, unit], order: [...ctx.battle.order, id] } }, `${d.title} erscheint.`);
+}
+
+/** Bausteine einer Fähigkeit (bzw. einer Objekt-Verwendung) mit Zielen ausführen. */
+function runAbility(
+  ctx: Ctx, caster: Unit, abilityId: string, a: AbilityFields & { title: string }, targets: Pos[], opts: ExecOptions, payCosts: boolean,
+): Ctx {
+  const chosen = a.targeting.kind === 'aoe' ? rangeTiles(ctx.battle, caster, a) : targets;
+  if (payCosts) ctx = pay(ctx, caster.id, a, a.targeting.kind === 'aoe' ? [] : chosen);
+  const hit = resolveHits(ctx, caster, a, chosen, opts.reaction);
+  if (!hit) return log(ctx, `${a.title} wird von einem Hindernis aufgehalten.`);
+  const source: Source = { unitId: caster.id, side: caster.side, typeIds: a.typeIds, kind: 'faehigkeit' };
+  const protectedIds = new Set<string>();
+  for (const u of hit.units) {
+    if (u.id === caster.id) continue;
+    const s = consumeShield(ctx, u.id, 'faehigkeit', source);
+    ctx = s.ctx;
+    if (s.blocked) {
+      protectedIds.add(u.id);
+      continue;
+    }
+    ctx = { ...ctx, battle: onTargeted(ctx.battle, u.id, caster.id, a.typeIds) };
+    if (u.side !== caster.side) ctx = setUnits(ctx, (x) => (x.id === u.id ? { ...x, lastAttackerId: caster.id } : x));
+    ctx = emit(ctx, { kind: 'targeted', targetId: u.id, sourceId: caster.id, abilityId, typeIds: a.typeIds });
+  }
+  for (const b of a.blocks) {
+    const fresh = { ...hit, units: hit.units.filter((u) => !protectedIds.has(u.id)).map((u) => getUnit(ctx.battle, u.id)!).filter((u) => u && u.status !== 'entfernt') };
+    ctx = applyBlock(ctx, getUnit(ctx.battle, caster.id) ?? caster, abilityId, a, b, fresh, chosen, opts);
+  }
+  ctx = emit(ctx, { kind: 'used', casterId: caster.id, abilityId, typeIds: a.typeIds, targetIds: hit.units.map((u) => u.id) });
+  if (!hit.units.length && !hit.tiles.length && a.blocks.length) ctx = log(ctx, `${a.title} trifft nichts.`);
+  return ctx;
 }
 
 /**
  * Führt eine Fähigkeit aus: Kosten bezahlen, Ziele (inkl. Hindernissen und Radius) auflösen,
- * Bausteine anwenden. Getroffene drehen sich ggf. zur Quelle.
+ * Schutz prüfen, Bausteine anwenden. Getroffene drehen sich ggf. zur Quelle.
  */
-export function executeAbility(ctx: Ctx, casterId: string, abilityId: string, targets: Pos[]): Ctx {
+export function executeAbility(ctx: Ctx, casterId: string, abilityId: string, targets: Pos[], opts: ExecOptions = {}): Ctx {
   const a = ctx.defs.abilities[abilityId];
   const caster = getUnit(ctx.battle, casterId);
   if (!a || !caster) return ctx;
-  const chosen = a.targeting.kind === 'aoe' ? rangeTiles(ctx.battle, caster, a) : targets;
-  ctx = { ...ctx, log: [...ctx.log, `${caster.name} setzt ${a.title} ein.`] };
-  ctx = pay(ctx, casterId, a, a.targeting.kind === 'aoe' ? [] : chosen);
-  const hit = resolveHits(ctx, caster, a, chosen);
-  if (!hit) return { ...ctx, log: [...ctx.log, `${a.title} wird von einem Hindernis aufgehalten.`] };
-  for (const u of hit.units) {
-    if (u.id === casterId) continue;
-    ctx = { ...ctx, battle: onTargeted(ctx.battle, u.id, casterId, a.typeIds) };
-    if (u.side !== caster.side) ctx = { ...ctx, battle: { ...ctx.battle, units: ctx.battle.units.map((x) => (x.id === u.id ? { ...x, lastAttackerId: casterId } : x)) } };
-  }
-  for (const b of a.blocks) {
-    const fresh = { ...hit, units: hit.units.map((u) => getUnit(ctx.battle, u.id)!).filter((u) => u && u.status !== 'entfernt') };
-    ctx = applyBlock(ctx, casterId, abilityId, a, b, fresh, chosen);
-  }
-  if (!hit.units.length && !hit.tiles.length && a.blocks.length) ctx = { ...ctx, log: [...ctx.log, `${a.title} trifft nichts.`] };
-  return ctx;
+  ctx = log(ctx, `${caster.name} setzt ${a.title} ein.`);
+  return runAbility(ctx, caster, abilityId, a, targets, opts, true);
 }
 
 export const abilityTitle = (ctx: Ctx, id: string) => titleOf(ctx.defs, id);
