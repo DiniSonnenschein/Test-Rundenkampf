@@ -1,7 +1,8 @@
 // Map-Editor (Vollbild): ein Finger malt bzw. platziert, zwei Finger zoomen und verschieben.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { newId, sortEntries } from '../../data/collection';
-import { getCollection, patchEntry, useCollection } from '../../data/store';
+import { createEntry, newId, sortEntries } from '../../data/collection';
+import { getDef } from '../../data/model';
+import { getCollection, patchEntry, saveEntry, useCollection } from '../../data/store';
 import type { Facing } from '../../engine/facing';
 import { posKey, samePos, type Pos } from '../../engine/grid';
 import {
@@ -9,7 +10,7 @@ import {
   type LevelFields, type PlacedEnemy, type PlacedObject, type Thing,
 } from '../../engine/level';
 import { normalizeObject } from '../../engine/objects';
-import { routes } from '../../router';
+import { navigate, routes } from '../../router';
 import { useDialog } from '../../ui/Dialog';
 import { Header } from '../../ui/Header';
 import { MapView } from './MapView';
@@ -29,6 +30,16 @@ const TOOLS: { tool: Tool; icon: string; label: string }[] = [
 ];
 
 const NO_TILE = '__kein-feld__';
+
+/** Zuletzt aus dem Map-Editor neu angelegter Eintrag – nach der Rückkehr wird er als Pinsel gewählt. */
+let lastCreated: { key: string; id: string } | null = null;
+
+const CREATE: { key: string; label: string; tool?: Tool }[] = [
+  { key: 'allys', label: 'Ally' },
+  { key: 'gegner', label: 'Gegner', tool: 'gegner' },
+  { key: 'objekte', label: 'Objekt', tool: 'objekt' },
+  { key: 'gelaende', label: 'Geländeart', tool: 'malen' },
+];
 const NEXT_FACING: Record<Facing, Facing> = { n: 'o', o: 's', s: 'w', w: 'n' };
 const MAX_HISTORY = 100;
 
@@ -46,8 +57,17 @@ export function MapEditorScreen({ id }: { id: string }) {
   const dialog = useDialog();
   const gelaende = useCollection('gelaende');
 
-  const [tool, setTool] = useState<Tool>('malen');
-  const [brush, setBrush] = useState<{ terrain: string | null; enemyId: string | null; objectId: string | null }>({ terrain: null, enemyId: null, objectId: null });
+  // Nach dem Anlegen eines neuen Eintrags direkt damit weiterarbeiten.
+  const [created] = useState(() => lastCreated);
+  useEffect(() => {
+    lastCreated = null;
+  }, []);
+  const [tool, setTool] = useState<Tool>(CREATE.find((c) => c.key === created?.key)?.tool ?? 'malen');
+  const [brush, setBrush] = useState<{ terrain: string | null; enemyId: string | null; objectId: string | null }>({
+    terrain: created?.key === 'gelaende' ? created.id : null,
+    enemyId: created?.key === 'gegner' ? created.id : null,
+    objectId: created?.key === 'objekte' ? created.id : null,
+  });
   const [draft, setDraft] = useState<LevelFields | null>(null);
   const [rect, setRect] = useState<{ a: Pos; b: Pos } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -330,6 +350,16 @@ export function MapEditorScreen({ id }: { id: string }) {
     sieg: 'Siegfelder an-/abschalten',
   };
 
+  async function createNew() {
+    const key = await dialog.menu({ title: 'Neu anlegen', items: CREATE.map((c) => ({ label: c.label, value: c.key })) });
+    const def = key ? getDef(key) : undefined;
+    if (!def) return;
+    const e = createEntry(def, null);
+    saveEntry(def.key, e);
+    lastCreated = { key: def.key, id: e.id };
+    navigate(routes.entry(def.key, e.id));
+  }
+
   function updateSelected(item: PlacedEnemy | PlacedObject) {
     commit(upsertThing(saved!, 'enemyId' in item ? { kind: 'gegner', item } : { kind: 'objekt', item }));
   }
@@ -342,6 +372,7 @@ export function MapEditorScreen({ id }: { id: string }) {
           back={routes.entry('level', id)}
           actions={
             <>
+              <button className="icon-btn" aria-label="Neu anlegen" onClick={createNew}>＋</button>
               <button className="icon-btn" aria-label="Rückgängig" disabled={!history.past.length} onClick={undo}>↶</button>
               <button className="icon-btn" aria-label="Wiederholen" disabled={!history.future.length} onClick={redo}>↷</button>
             </>

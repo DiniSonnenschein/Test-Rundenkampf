@@ -83,7 +83,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 8 | Objekte / Gegenstände | ✅ |
 | 9 | Geländearten | ✅ |
 | 10 | Level-Editor | ✅ |
-| 11 | Dungeon-Editor | ⬜ |
+| 11 | Dungeon-Editor | ✅ |
 | 12 | Neues Spiel (Setup) | ⬜ |
 | 13 | Spielmodus (Kampf-Oberfläche) | ⬜ |
 | 14 | Speichern & Laden | ⬜ |
@@ -181,6 +181,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | Laternen-Radius (Standard, je Ally später abweichend möglich) | 3 |
 | Form des Lichtkegels (Kreis / Quadrat) | Kreis |
 | Erkundete Felder bleiben aufgedeckt (Gelände ja, Figuren nein) | an |
+| Effekte laufen beim Levelwechsel weiter (sonst enden alle) | an |
 | Außerhalb des eigenen Zuges zur Quelle drehen, wenn Ziel von: nie / gegnerischen / allen / bestimmten Typen von Fähigkeiten/Effekten | nie |
 | Bei Initiative-Gleichstand: Allys zuerst / Gegner zuerst / abwechselnd | Allys zuerst |
 | Züge pro Charakter und Runde | 1 |
@@ -476,6 +477,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 
 **Map-Editor** (Vollbild):
 - **Ein Finger** malt bzw. platziert, **zwei Finger** zoomen und verschieben (am Computer: Mausrad). Tipp-Aktionen werden erst beim Loslassen ausgeführt, damit der erste Finger eines Zooms nichts auslöst.
+- **„+ Neu“** (oben): Ally, Gegner, Objekt oder Geländeart direkt anlegen – öffnet den Editor, „Zurück“ führt wieder in die Map; das Neue ist dann gleich als Pinsel gewählt.
 - **Werkzeuge:** Malen (antippen/wischen) · Rechteck · Füllen (Farbeimer) – jeweils mit gewählter Geländeart oder **„Kein Feld“** (für nicht-rechteckige Maps) · Gegner platzieren · Objekt platzieren · Auswählen · Laternen-Startfeld (genau eines) · Siegfelder an/aus
 - **Auswählen:** verschieben, Gegner drehen (Blickrichtung), Patrouille (Wegpunkte antippen; Rundweg oder hin & zurück; letzten Punkt entfernen), Objekte „verborgen“ abweichend von der Vorlage (wie Vorlage / ja / nein), löschen. Liegen mehrere Dinge auf einem Feld, wählt erneutes Tippen das nächste.
 - **Rückgängig / Wiederholen**
@@ -488,10 +490,26 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 
 ### 11 – Dungeon-Editor
 **Ziel:** Level zu Dungeons aneinanderreihen.
-- Reihenfolge (linear oder verzweigt?)
-- Übergänge zwischen Leveln (Rast, Belohnungen, Zustand bleibt erhalten?)
 
-**Offene Punkte / Entscheidungen:** –
+**Stationen (Liste):**
+- Jede Station ist ein Level mit **eigenem Namen** im Dungeon; dasselbe Level darf mehrfach vorkommen. Angezeigt werden Anzahl Gegner, Gegenstände und Größe; „Öffnen“ springt ins Level.
+- Die erste Station ist der **Start** (umsortierbar).
+- **Verzweigungen:** pro Station „Weiter zu …“ (mehrere möglich → **der Spieler wählt**). Wege können wieder **zusammenführen**. Stationen ohne Folgestation sind ein **Ende → Run gewonnen**.
+- **„+ Level“**: vorhandenes Level wählen oder **neues Level bauen** (öffnet den Level-Editor, zurück geht es in den Dungeon). Neue Stationen werden automatisch an die bisher letzte angehängt.
+- **Prüfung:** Stationen ohne Level, nicht erreichbare Stationen, kein erreichbares Ende.
+
+**Zwischenstation** (optional nach jeder Station, Bausteine mit „+“):
+- **Rast:** Ressourcen ± (individuelle für alle Allys, globale für den Pool)
+- **Belohnung:** Gegenstände, optional „wähle X davon“ (pro Station einstellbar); der Spieler wählt, welcher Ally sie bekommt
+- **Effekte** vergeben (mit Dauer) oder beenden (Effekt bzw. Typen), für alle Allys
+- **Rucksäcke ordnen & Gegenstände zwischen Allys tauschen**
+- **Händler:** bezahlt wird mit einer **globalen Ressource**; **Grundpreise je Objekt-Typ** und **Sonderpreise je Objekt** (gehen vor), jeweils mit **Kauf- und Verkaufspreis**; Angebot mit Vorrat (oder unbegrenzt). Nur kaufen und verkaufen, kein Tauschen.
+
+**Levelwechsel:** Gegenstände (Rucksack und Getragenes) bleiben · was am Boden liegt, ist weg · Gegner bleiben zurück, jedes Level startet frisch · ob Effekte weiterlaufen, legt das **Regelwerk** fest (ein Schalter für alle).
+
+**Umsetzung:**
+- `src/engine/dungeon.ts` – Datenmodell, Erreichbarkeit, Prüfung, Händler-Preise (mit Tests)
+- `src/screens/editors/DungeonEditor.tsx`
 
 ### 12 – Neues Spiel (Setup)
 **Ziel:** Testlauf konfigurieren und starten.

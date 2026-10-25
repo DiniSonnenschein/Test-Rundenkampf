@@ -26,6 +26,8 @@ export interface Rules {
   };
   /** Reguläre Züge pro Charakter und Runde. */
   turnsPerRound: number;
+  /** Effekte laufen beim Levelwechsel weiter (sonst enden alle). */
+  effectsPersistAcrossLevels: boolean;
   facing: {
     turnWhenTargeted: TurnWhenTargeted;
     /** Typen (Fähigkeiten & Effekte) für 'typen'. */
@@ -45,6 +47,7 @@ export const DEFAULT_RULES: Rules = {
   light: { lanternRadius: 3, shape: 'kreis', rememberExplored: true },
   initiative: { tieBreak: 'allys-zuerst' },
   turnsPerRound: 1,
+  effectsPersistAcrossLevels: true,
   facing: { turnWhenTargeted: 'nie', typeIds: [] },
   defeat: { unconsciousTurns: 2, unconsciousCount: 'alle' },
 };
@@ -65,6 +68,7 @@ export function normalizeRules(partial: unknown): Rules {
       tieBreak: p.initiative?.tieBreak ?? d.initiative.tieBreak,
     },
     turnsPerRound: p.turnsPerRound ?? d.turnsPerRound,
+    effectsPersistAcrossLevels: p.effectsPersistAcrossLevels ?? d.effectsPersistAcrossLevels,
     facing: {
       turnWhenTargeted: p.facing?.turnWhenTargeted ?? d.facing.turnWhenTargeted,
       typeIds: p.facing?.typeIds ?? [],

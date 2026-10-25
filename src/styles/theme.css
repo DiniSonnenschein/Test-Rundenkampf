@@ -397,3 +397,12 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .selection-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .selection-actions .btn { width: auto; flex: 1 1 auto; }
 .icon-btn:disabled { opacity: .35; }
+
+/* ---------- Abschnitt 11: Dungeons ---------- */
+.wrap-row { flex-wrap: wrap; }
+.wrap-row > select { flex: 1 1 140px; }
+.price-fields { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 8px; flex: 1 1 100%; }
+.price-fields .stepper { width: 100%; }
+.station { gap: 8px; }
+.station .card { background: transparent; border-style: dashed; }
+.station-open { width: auto; flex: none; }

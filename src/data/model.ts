@@ -2,6 +2,7 @@ import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
 import { DEFAULT_OBJECT, normalizeObject } from '../engine/objects';
+import { normalizeDungeon } from '../engine/dungeon';
 import { DEFAULT_LEVEL, normalizeLevel } from '../engine/level';
 import { DEFAULT_TERRAIN, normalizeTerrain } from '../engine/terrain';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
@@ -149,7 +150,14 @@ export const BAUSTEINE: CollectionDef[] = [
       return `${l.width}×${l.height} · ${l.enemies.length} Gegner`;
     },
   },
-  { key: 'dungeons', label: 'Dungeons', singular: 'Dungeon', newTitle: 'Neuer Dungeon', icon: '🏰', creatable: true, section: 11 },
+  {
+    key: 'dungeons', label: 'Dungeons', singular: 'Dungeon', newTitle: 'Neuer Dungeon', icon: '🏰', creatable: true, section: 11,
+    defaults: () => ({ stations: [] }),
+    subtitle: (e) => {
+      const n = normalizeDungeon(e).stations.length;
+      return n === 1 ? '1 Level' : `${n} Level`;
+    },
+  },
 ];
 
 export const SPIELE: CollectionDef = {

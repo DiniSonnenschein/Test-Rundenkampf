@@ -68,7 +68,13 @@ export function RulesEditor({ entry, set }: EditorProps) {
 
         <label className="field-label" htmlFor="turns">Züge pro Charakter und Runde (Standard)</label>
         <Stepper id="turns" value={rules.turnsPerRound} min={1} max={5} onChange={(v) => update((r) => ({ ...r, turnsPerRound: v }))} />
-        <p className="muted small">Was in einem Zug möglich ist, legen die Aktionsplätze und Fähigkeiten jedes Charakters fest.</p>
+        <p className="muted small">Was in einem Zug möglich ist, legen die Aktionen und Fähigkeiten jedes Charakters fest.</p>
+        <Toggle
+          label="Effekte laufen beim Levelwechsel weiter"
+          hint="Sonst enden alle Effekte am Ende eines Levels"
+          checked={rules.effectsPersistAcrossLevels}
+          onChange={(v) => update((r) => ({ ...r, effectsPersistAcrossLevels: v }))}
+        />
       </section>
 
       <section className="card fields">
