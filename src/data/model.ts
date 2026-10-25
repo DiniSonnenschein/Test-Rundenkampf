@@ -1,4 +1,5 @@
 import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
+import { DEFAULT_CHARACTER } from '../engine/characters';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
@@ -62,7 +63,10 @@ export const BAUSTEINE: CollectionDef[] = [
     key: 'regelwerke', label: 'Regelwerke', singular: 'Regelwerk', newTitle: 'Neues Regelwerk', icon: '📜', creatable: true, section: 2,
     defaults: () => ({ rules: structuredClone(DEFAULT_RULES) }),
   },
-  { key: 'allys', label: 'Allys', singular: 'Ally', newTitle: 'Neuer Ally', icon: '🛡️', visible: true, creatable: true, section: 6 },
+  {
+    key: 'allys', label: 'Allys', singular: 'Ally', newTitle: 'Neuer Ally', icon: '🛡️', visible: true, creatable: true, section: 6,
+    defaults: () => structuredClone(DEFAULT_CHARACTER) as unknown as Record<string, unknown>,
+  },
   { key: 'gegner', label: 'Gegner', singular: 'Gegner', newTitle: 'Neuer Gegner', icon: '👹', visible: true, creatable: true, section: 7 },
   { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
   { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },

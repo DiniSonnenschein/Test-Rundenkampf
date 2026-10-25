@@ -78,7 +78,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 3 | Ressourcen & Attribute | ✅ |
 | 4 | Effekte | ✅ |
 | 5 | Fähigkeiten | ✅ |
-| 6 | Allys | ⬜ |
+| 6 | Allys | ✅ |
 | 7 | Gegner & Gegner-KI | ⬜ |
 | 8 | Objekte / Gegenstände | ⬜ |
 | 9 | Geländearten | ⬜ |
@@ -197,8 +197,8 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - Spielbar wird der Ablauf mit der Kampf-Oberfläche (Abschnitt 13).
 
 **Offene Punkte (für spätere Abschnitte):**
-- Belegen Figuren mit Größe > 1 mehrere Felder? (vorerst belegt jede Figur genau ein Feld)
-- Dürfen Figuren durch verbündete/feindliche Figuren hindurchziehen? (vorerst nein)
+- ~~Größe > 1~~ → geklärt: Größe 2 belegt 2×2 Felder (Abschnitt 6)
+- ~~Durch Figuren hindurchziehen~~ → geklärt über „Kollision“ (pro Charakter/Objekt) und den Effekt-Baustein „Keine Kollision“
 
 ### 3 – Ressourcen & Attribute
 **Ziel:** Frei definierbare Werte, mit denen Charaktere und Fähigkeiten arbeiten.
@@ -273,6 +273,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Hindernisse ignorieren | Objekte / Allys / Gegner / Gelände – alle oder bestimmte (Einträge und/oder Typen) |
 | Ressource unveränderlich | eine globale oder eigene Ressource kann nicht verändert werden durch: alle / gegnerische / Ally- / eigene Fähigkeiten & Effekte / bestimmte Typen |
 | Keine Kollision | kann Felder mit anderen teilen und gilt nicht als Hindernis; bleibt anvisierbar |
+| Ziel verwandeln | in einen anderen Ally / Gegner / Gegenstand (Art kann wechseln); endet der Effekt, wird zurückverwandelt. Verwandelte Allys zählen für den Sieg weiter als Ally (auch als getragener Blumentopf) |
 | Nicht wahrnehmbar | für alle oder bestimmte Charaktere: nicht anvisierbar (AOE trifft trotzdem), Gegner behandeln ihn als nicht existent; Darstellung: Gegner unsichtbar, Allys transparent |
 
 **Auslöser** (wann ein Charakter den Effekt erhält; beliebig viele):
@@ -334,6 +335,8 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Ziel bewegen | in Richtung (mögliche Zielfelder per Bereich, oben = Norden) / vom Anwender weg / zum Anwender hin um X Felder; Hindernisse stoppen (außer ignoriert) |
 | Anwender bewegen | zum gewählten Ort (mögliche Felder per Bereich, oben = Norden); ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung |
 | Feld in Geländeart umwandeln | bis zum Ende des Levels |
+| Ziel zerstören | nur Objekte und Gegner: werden aus dem Level entfernt |
+| Ziel ersetzen | nur Objekte und Gegner: dauerhaft in ein Objekt oder einen Gegner verwandelt (Position & Blickrichtung bleiben, Werte starten neu) |
 | Sammeln | nur Objekte, in den Rucksack des Anwenders |
 | Tragen | alles ist tragbar, beliebig viel; Getragenes bleibt auf dem Feld des Anwenders |
 | Platzieren | Getragenes oder Objekte aus dem Rucksack; Zielort per Bereich; Hindernisse ignorieren ja/nein |
@@ -351,28 +354,45 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 - Objekt-Typen als dritte Typen-Liste in den Einstellungen
 
 ### 6 – Allys
-**Ziel:** Spielbare Charaktere anlegen.
-- ~~Name, Bild/Symbol~~ → bereits vorhanden: Titel, Notiz, Form, Farbe, Größe (Abschnitt 1)
-- Ressourcen je Charakter: Maximum, Startwert, automatische Veränderungen (pro Zug/Runde/Level), Anpassungen durch Fähigkeiten; Initiative-Wert
-- Fähigkeiten, Aktionsplätze
-- Laterne: Kann der Ally Laternenträger sein? Eigener Laternen-Radius?
-- **Sicht im Nebel** per Bereichs-Auswahl
-- **Typen** aus der Liste „Allys & Gegner“
-- **Reaktionen** (kleine Zwischen-Züge, die nicht als Züge gelten und durch ein Ereignis einmalig ausgelöst werden)
-- Ausnahmen: Effekte, von denen der Charakter nicht betroffen sein kann
-- **Kollision** (ist Hindernis, belegt sein Feld) ja/nein
-- Rucksack (gesammelte Objekte)
-- Darf eine Fähigkeit mehrfach pro Zug genutzt werden (z. B. Bewegung in Etappen)?
-- Zusätzliche Züge pro Runde / Reaktionen
-- Ausrüstung/Inventar-Plätze?
-- Klassen, Stufen/Levelaufstieg?
+**Ziel:** Spielbare Charaktere anlegen (Charakter-Editor; Gegner nutzen ihn in Abschnitt 7 mit zusätzlichen Feldern).
 
-**Offene Punkte / Entscheidungen:** –
+**Darstellung:** Form, Farbe, **Größe** (nur ganze Zahlen; Größe 2 belegt 2×2 Felder, die Kollision wächst mit). Bei großen Figuren werden Reichweite, Sicht und andere Bereiche von **jedem** belegten Feld aus gemessen (Vereinigung).
+
+**Grundsätzliches:** Typen (Liste „Allys & Gegner“) · **Kollision** ja/nein (ist Hindernis, belegt seine Felder) · **Rucksackplätze** (individuell) · **Start-Gegenstände** (ob Gegenstände in einem Platz stapelbar sind, legt das Objekt fest)
+
+**Sicht im Nebel:** Bereichs-Auswahl (dreht mit der Blickrichtung).
+
+**Ressourcen:** mit „+“ werden die individuellen Ressourcen gewählt; **Initiative** ist immer dabei. Je Ressource: Maximum (ja/nein, Höhe), Startwert, automatische Veränderungen (pro Zug/Runde/Level, zu Beginn/am Ende, ±Wert, mehrfach), Anpassungen durch Fähigkeiten. Hat ein Charakter eine Ressource nicht, passiert bei Veränderungen nichts.
+
+**Aktionen:** beliebig viele (mit „+“), **benennbar** (z. B. „Angriffs-Aktion“). Jede enthält beliebig viele Fähigkeiten mit **maximaler Nutzungszahl** (meist 1). Pro Zug kann in jeder Aktion nur **eine** Fähigkeit gewählt werden – danach ist die Aktion auf sie festgelegt (bis zu ihrer max. Nutzungszahl).
+
+*Im Spiel:*
+- Ist der Charakter am Zug, öffnen sich um ihn herum alle Aktionen (beliebige Reihenfolge).
+- Tippt man eine Aktion an, erscheinen ihre Fähigkeiten: Fähigkeiten mit **nicht erfüllten Bedingungen** werden nicht angezeigt; erfüllte, aber **nicht bezahlbare** sind ausgegraut.
+- Enthält eine Aktion grundsätzlich nur **eine** Fähigkeit, wird sie direkt ausgeführt (nicht, wenn andere nur wegen ihrer Bedingungen ausgeblendet sind).
+- Nach Zielwahl und Abwicklung erscheint die Aktionen-Auswahl erneut; ausgeführte Aktionen sind ausgegraut und nicht mehr anklickbar – außer die gewählte Fähigkeit hat noch Nutzungen und ist bezahlbar (z. B. Bewegung).
+- Der Zug kann jederzeit vorzeitig beendet werden.
+- **Zwang-Fähigkeiten**, die einsetzbar sind, starten zu Beginn des Zuges sofort; es werden nur noch die Ziele gewählt.
+
+**Reaktionen:** beliebig viele (benennbar): eine Liste von Fähigkeiten **mit Auslöser** und wie oft nutzbar (pro Runde / pro Level / unbegrenzt). Keine Züge, verbrauchen keine Aktion.
+
+**Start-Effekte:** Effekte, die nur dieser Charakter ab Spielbeginn hat (mit Dauer).
+
+**Effekt-Ausnahmen:** einzelne Effekte und/oder Effekt-Typen, von denen der Charakter nicht betroffen sein kann.
+
+**Laterne:** wird bei der **Erstellung eines Spiels** einem Ally zugewiesen (Abschnitt 12) – immer genau einer, nicht abgebbar, Werte aus dem Regelwerk. Im Ally-Editor gibt es dazu nichts einzustellen.
+
+**Stufen/Fortschritt:** wird bei der Spiel-Erstellung geklärt.
+
+**Umsetzung:**
+- `src/engine/characters.ts` – Datenmodell des Charakters
+- `src/engine/battle.ts` – Aktionen (Festlegung auf eine Fähigkeit, Nutzungen), Größe (mehrere Felder) und Kollision (mit Tests)
+- `src/screens/editors/CharacterEditor.tsx`
 
 ### 7 – Gegner & Gegner-KI
 **Ziel:** Nicht-spielbare Charaktere inkl. Verhalten anlegen.
 - Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
-- Werte und Fähigkeiten (wie Allys)
+- Gleicher Charakter-Editor wie Allys (Werte, Aktionen, Reaktionen, Start-Effekte, Ausnahmen, Sicht, Kollision, Rucksack)
 - Verhalten/KI: einfache Regeln (z. B. „greift schwächstes Ziel an“, „heilt bei < 30 % LP“) – frei konfigurierbar?
 - Was passiert bei 0 LP o. Ä. (bewusstlos, flieht, verschwindet …)
 - **Sicht im Nebel** per Bereichs-Auswahl, **Typen**, Reaktionen, Effekt-Ausnahmen, Kollision (wie Allys)
@@ -385,6 +405,7 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 ### 8 – Objekte / Gegenstände
 **Ziel:** Sammelbare und nutzbare Gegenstände.
 - Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
+- **Stapelbar** in einem Rucksackplatz ja/nein (ggf. wie viele)
 - Typen: Verbrauchsgegenstände, Ausrüstung, Schlüssel/Quest-Objekte, Fallen, interaktive Map-Objekte (Truhen, Hebel)?
 - Wirkung über Effekte
 - **Wirft Schatten** (blockiert Licht/Sicht) – pro Objekt einstellbar

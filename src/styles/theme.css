@@ -338,3 +338,12 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .indent { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 6px; padding-left: 12px; border-left: 2px solid var(--border); }
 .inline-costs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
 .inline-costs .btn-row .btn { min-height: 40px; }
+
+/* ---------- Abschnitt 6: Allys ---------- */
+.fields.embedded { gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.fields.embedded h3 { margin: 0; font-size: .95rem; }
+.ability-row { display: flex; align-items: center; gap: 6px; }
+.ability-row .ability-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ability-row .stepper { flex: none; width: 150px; }
+.ability-row .stepper .btn { width: 40px; }
+.ability-row > select { flex: 1; min-width: 0; }

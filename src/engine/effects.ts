@@ -53,7 +53,9 @@ export type EffectBlock =
   /** Nicht wahrnehmbar für alle bzw. bestimmte Charaktere (AOE trifft trotzdem). */
   | { kind: 'unsichtbar'; selection: Selection }
   /** Keine Kollision: kann Felder mit anderen teilen und gilt nicht als Hindernis; bleibt anvisierbar. */
-  | { kind: 'keine-kollision' };
+  | { kind: 'keine-kollision' }
+  /** Verwandelt den Träger in einen Ally/Gegner/Gegenstand; endet der Effekt, wird zurückverwandelt. Allys zählen weiter als Ally. */
+  | { kind: 'verwandeln'; into: { kind: EntityKind; id: string | null } };
 
 // ---------- Auslöser & Beendigung ----------
 

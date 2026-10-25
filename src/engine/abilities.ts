@@ -92,6 +92,10 @@ export type AbilityBlockBody =
   /** Mögliche Zielfelder als Bereich (unabhängig von der Blickrichtung). Ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung. */
   | { kind: 'anwender-bewegen'; area: Area; ignoresObstacles: boolean }
   | { kind: 'gelaende'; terrainId: string | null }
+  /** Nur Objekte und Gegner: werden aus dem Level entfernt. */
+  | { kind: 'zerstoeren' }
+  /** Nur Objekte und Gegner: werden dauerhaft in ein Objekt oder einen Gegner verwandelt (Position & Blickrichtung bleiben). */
+  | { kind: 'ersetzen'; into: { kind: 'objekt' | 'gegner'; id: string | null } }
   | { kind: 'sammeln' }
   | { kind: 'tragen' }
   | { kind: 'platzieren'; what: 'getragenes' | 'rucksack'; selection: Selection; area: Area; ignoresObstacles: boolean }

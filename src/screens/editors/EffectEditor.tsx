@@ -47,6 +47,7 @@ const BLOCKS: { kind: EffectBlock['kind']; label: string; create: () => EffectBl
   { kind: 'unveraenderlich', label: 'Ressource unveränderlich', create: () => ({ kind: 'unveraenderlich', resourceId: null, by: 'alle', typeIds: [] }) },
   { kind: 'unsichtbar', label: 'Nicht wahrnehmbar', create: () => ({ kind: 'unsichtbar', selection: { ...ALL } }) },
   { kind: 'keine-kollision', label: 'Keine Kollision', create: () => ({ kind: 'keine-kollision' }) },
+  { kind: 'verwandeln', label: 'Ziel verwandeln', create: () => ({ kind: 'verwandeln', into: { kind: 'objekt', id: null } }) },
 ];
 
 function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: EffectBlock) => void; selfId: string }) {
@@ -193,6 +194,17 @@ function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: E
         <p className="muted small">
           Der Charakter kann sich ein Feld mit anderen teilen und gilt nicht als Hindernis. Anvisiert werden kann er trotzdem.
         </p>
+      );
+    case 'verwandeln':
+      return (
+        <>
+          <p className="muted small">
+            Der Charakter bzw. Gegenstand wird verwandelt (die Art kann wechseln). Endet der Effekt, wird er zurückverwandelt. Ein verwandelter
+            Ally zählt für den Sieg weiter als Ally – auch als Blumentopf, der getragen wird.
+          </p>
+          <Choice<EntityKind> value={b.into.kind} options={ENTITY_OPTIONS} onChange={(kind) => set({ ...b, into: { kind, id: null } })} />
+          <RefSelect collection={ENTITY_COLLECTION[b.into.kind]} value={b.into.id} emptyLabel="– auswählen –" onChange={(id) => set({ ...b, into: { ...b.into, id } })} />
+        </>
       );
     case 'unsichtbar':
       return (

@@ -278,6 +278,8 @@ const BLOCKS: { kind: AbilityBlock['kind']; label: string; create: () => Ability
   { kind: 'ziel-bewegen', label: 'Ziel bewegen', create: () => ({ kind: 'ziel-bewegen', mode: 'weg', area: [], distance: 1, ignoresObstacles: false, extraCosts: [] }) },
   { kind: 'anwender-bewegen', label: 'Anwender bewegen', create: () => ({ kind: 'anwender-bewegen', area: [], ignoresObstacles: false, extraCosts: [] }) },
   { kind: 'gelaende', label: 'Feld in Geländeart umwandeln', create: () => ({ kind: 'gelaende', terrainId: null, extraCosts: [] }) },
+  { kind: 'zerstoeren', label: 'Ziel zerstören', create: () => ({ kind: 'zerstoeren', extraCosts: [] }) },
+  { kind: 'ersetzen', label: 'Ziel ersetzen', create: () => ({ kind: 'ersetzen', into: { kind: 'objekt', id: null }, extraCosts: [] }) },
   { kind: 'sammeln', label: 'Sammeln (in den Rucksack)', create: () => ({ kind: 'sammeln', extraCosts: [] }) },
   { kind: 'tragen', label: 'Tragen', create: () => ({ kind: 'tragen', extraCosts: [] }) },
   { kind: 'platzieren', label: 'Platzieren', create: () => ({ kind: 'platzieren', what: 'getragenes', selection: { ...ALL }, area: [], ignoresObstacles: false, extraCosts: [] }) },
@@ -389,6 +391,20 @@ function BlockFields({ b, set }: { b: AbilityBlock; set: (b: AbilityBlock) => vo
         <>
           <RefSelect collection="gelaende" value={b.terrainId} emptyLabel="– Geländeart wählen –" onChange={(terrainId) => set({ ...b, terrainId })} />
           <p className="muted small">Gilt bis zum Ende des Levels.</p>
+        </>
+      );
+    case 'zerstoeren':
+      return <p className="muted small">Nur Objekte und Gegner: werden aus dem Level entfernt.</p>;
+    case 'ersetzen':
+      return (
+        <>
+          <p className="muted small">Nur Objekte und Gegner: werden dauerhaft in etwas anderes verwandelt (Position und Blickrichtung bleiben, Werte starten neu).</p>
+          <Choice<'objekt' | 'gegner'>
+            value={b.into.kind}
+            options={[{ value: 'objekt', label: 'In ein Objekt' }, { value: 'gegner', label: 'In einen Gegner' }]}
+            onChange={(kind) => set({ ...b, into: { kind, id: null } })}
+          />
+          <RefSelect collection={ENTITY_COLLECTION[b.into.kind]} value={b.into.id} emptyLabel="– auswählen –" onChange={(id) => set({ ...b, into: { ...b.into, id } })} />
         </>
       );
     case 'sammeln':

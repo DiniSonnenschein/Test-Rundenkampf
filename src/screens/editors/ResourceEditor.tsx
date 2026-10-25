@@ -106,16 +106,18 @@ const INTERVAL_LABELS: Record<ChangeInterval, string> = { zug: 'Pro Zug', runde:
 
 /** Automatische Veränderungen (auch für die Charaktererstellung wiederverwendbar). */
 export function ChangesCard({
-  changes, intervals, onChange,
+  changes, intervals, onChange, embedded = false,
 }: {
   changes: AutoChange[];
   intervals: ChangeInterval[];
   onChange: (c: AutoChange[]) => void;
+  /** Innerhalb einer anderen Karte (kleinere Überschrift, kein eigener Rahmen). */
+  embedded?: boolean;
 }) {
   const edit = (i: number, patch: Partial<AutoChange>) => onChange(changes.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   return (
-    <section className="card fields">
-      <h2>Automatische Veränderung</h2>
+    <section className={embedded ? 'fields embedded' : 'card fields'}>
+      {embedded ? <h3>Automatische Veränderung</h3> : <h2>Automatische Veränderung</h2>}
       <p className="muted small">Erhöhungen überschreiten das Maximum nicht.</p>
       {changes.map((c, i) => (
         <div key={i} className="sub-card">
@@ -140,11 +142,17 @@ export function ChangesCard({
 }
 
 /** Anpassung durch Fähigkeiten (auch für die Charaktererstellung wiederverwendbar). */
-export function AdjustmentsCard({ adjustments, onChange }: { adjustments: Adjustment[]; onChange: (a: Adjustment[]) => void }) {
+export function AdjustmentsCard({
+  adjustments, onChange, embedded = false,
+}: {
+  adjustments: Adjustment[];
+  onChange: (a: Adjustment[]) => void;
+  embedded?: boolean;
+}) {
   const edit = (i: number, patch: Partial<Adjustment>) => onChange(adjustments.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   return (
-    <section className="card fields">
-      <h2>Anpassung durch Fähigkeiten</h2>
+    <section className={embedded ? 'fields embedded' : 'card fields'}>
+      {embedded ? <h3>Anpassung durch Fähigkeiten</h3> : <h2>Anpassung durch Fähigkeiten</h2>}
       <p className="muted small">
         Verändert den Betrag, um den eine Fähigkeit diese Ressource verändert: −5 bei „Angriff“ wirkt wie 5 Verteidigung. Die Wirkung kippt
         nie um (endet bei 0).

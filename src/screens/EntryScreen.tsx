@@ -12,6 +12,7 @@ import { SHAPES, ShapeIcon } from '../ui/shapes';
 import { EDITORS } from './editors';
 import { useEntryActions } from './useEntryActions';
 import { Stepper } from '../ui/fields';
+import { tileSize } from '../engine/characters';
 
 export function EntryScreen({ def, id }: { def: CollectionDef; id: string }) {
   const col = useCollection(def.key);
@@ -100,13 +101,13 @@ export function EntryScreen({ def, id }: { def: CollectionDef; id: string }) {
 function LookFields({ entry, set }: { entry: Entry; set: (patch: Partial<Entry>) => void }) {
   const shape = typeof entry.shape === 'string' ? entry.shape : DEFAULT_LOOK.shape;
   const color = typeof entry.color === 'string' ? entry.color : DEFAULT_LOOK.color;
-  const size = typeof entry.size === 'number' ? entry.size : DEFAULT_LOOK.size;
+  const size = tileSize(entry.size ?? DEFAULT_LOOK.size);
 
   return (
     <section className="card fields">
       <h2>Darstellung im Spiel</h2>
       <div className="look-preview">
-        <ShapeIcon shape={shape} color={color} size={Math.min(140, 56 * size)} />
+        <ShapeIcon shape={shape} color={color} size={Math.min(140, 40 + 25 * size)} />
       </div>
 
       <span className="field-label">Form</span>
@@ -128,7 +129,8 @@ function LookFields({ entry, set }: { entry: Entry; set: (patch: Partial<Entry>)
       <ColorWheel value={color} onChange={(c) => set({ color: c })} />
 
       <label className="field-label" htmlFor="size">Größe</label>
-      <Stepper id="size" value={size} min={0.1} step={0.1} bigStep={0.5} onChange={(v) => set({ size: v })} />
+      <Stepper id="size" value={size} min={1} max={5} onChange={(v) => set({ size: v })} />
+      <p className="muted small">Größe 2 belegt 2×2 Felder (die Kollision wächst mit).</p>
     </section>
   );
 }

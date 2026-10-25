@@ -2,6 +2,7 @@
 // Der Zustand ist reines JSON (für Spielstände); alle Funktionen liefern einen neuen Zustand.
 import { areaTiles, facingFromStep, facingTowards, type Area, type Facing } from './facing';
 import { inBounds, posKey, samePos, type Grid, type Pos } from './grid';
+import type { CharacterAction } from './characters';
 import { initiativeOrder } from './initiative';
 import { INITIATIVE_ID } from './resources';
 import { litTiles, visibleTiles, type LightSource } from './light';
@@ -32,8 +33,12 @@ export interface Unit {
   targetId?: string;
   /** Abweichende Anzahl Züge pro Runde. */
   turnsPerRound?: number;
-  /** Aktionsplätze eines Zuges; jeder Platz bietet eine Auswahl an Fähigkeiten (IDs). */
-  actionSlots: string[][];
+  /** Aktionen eines Zuges; jede bietet eine Auswahl an Fähigkeiten. */
+  actions: CharacterAction[];
+  /** Größe in Feldern (2 = 2×2); pos ist das Feld oben links. */
+  size?: number;
+  /** Ist ein Hindernis und belegt seine Felder (Standard: ja). */
+  collision?: boolean;
   /** Aktuelle Werte der individuellen Ressourcen (ID → Menge). */
   values?: Record<string, number>;
 }
@@ -51,7 +56,8 @@ export interface BattleMap {
 
 export interface Turn {
   unitId: string;
-  usedSlots: number[];
+  /** Je Aktion (Index): gewählte Fähigkeit und bisherige Nutzungen. */
+  used: Record<number, { abilityId: string; uses: number }>;
 }
 
 export interface BattleState {
@@ -89,8 +95,20 @@ export function gridOf(map: BattleMap): Grid {
 
 export const getUnit = (s: BattleState, id: string) => s.units.find((u) => u.id === id);
 export const lanternBearer = (s: BattleState) => s.units.find((u) => u.side === 'ally' && u.lantern);
+/** Alle Felder, die eine Figur belegt. */
+export function unitTiles(u: Unit, pos: Pos | null = u.pos): Pos[] {
+  if (!pos) return [];
+  const n = u.size ?? 1;
+  const tiles: Pos[] = [];
+  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) tiles.push({ x: pos.x + dx, y: pos.y + dy });
+  return tiles;
+}
+
+const occupies = (u: Unit, p: Pos) => u.status !== 'entfernt' && unitTiles(u).some((t) => samePos(t, p));
+
+/** Figur auf einem Feld (bevorzugt eine mit Kollision). */
 export const unitAt = (s: BattleState, p: Pos) =>
-  s.units.find((u) => u.pos && samePos(u.pos, p) && u.status !== 'entfernt');
+  s.units.find((u) => occupies(u, p) && u.collision !== false) ?? s.units.find((u) => occupies(u, p));
 
 function lightSources(s: BattleState): LightSource[] {
   return s.units
@@ -104,7 +122,7 @@ export const facingOf = (u: Unit): Facing => u.facing ?? 'n';
 export function visible(s: BattleState): Set<string> {
   const viewers = s.units
     .filter((u) => u.side === 'ally' && u.status === 'aktiv' && u.pos)
-    .map((u) => ({ pos: u.pos!, tiles: areaTiles(u.pos!, u.sightArea ?? [], facingOf(u)) }));
+    .flatMap((u) => unitTiles(u).map((t) => ({ pos: t, tiles: areaTiles(t, u.sightArea ?? [], facingOf(u)) })));
   return visibleTiles(gridOf(s.map), lightSources(s), viewers, s.rules.light.shape);
 }
 
@@ -156,7 +174,7 @@ export function createBattle(opts: {
   const area = placementArea(s);
   const start = opts.map.lanternStart;
   for (const ally of s.units.filter((u) => u.side === 'ally' && !u.pos)) {
-    const free = (p: Pos) => area.some((a) => samePos(a, p)) && !unitAt(s, p);
+    const free = (p: Pos) => canStand(s, ally, p, area);
     const prev = opts.previous?.[ally.id];
     let target: Pos | undefined = prev && { x: start.x + prev.dx, y: start.y + prev.dy };
     if (!target || !free(target)) {
@@ -169,18 +187,33 @@ export function createBattle(opts: {
   return withExplored(s);
 }
 
-/** Verschiebt einen Ally während der Platzierung; steht dort schon ein Ally, tauschen beide. */
+/** Kann eine Figur (mit allen ihren Feldern) hier stehen? Optional nur innerhalb eines Bereichs. */
+function canStand(s: BattleState, unit: Unit, pos: Pos, within?: Pos[], ignore: string[] = []): boolean {
+  const g = gridOf(s.map);
+  return unitTiles(unit, pos).every(
+    (t) =>
+      g.isPassable(t) &&
+      (!within || within.some((a) => samePos(a, t))) &&
+      !s.units.some((u) => u.id !== unit.id && !ignore.includes(u.id) && u.collision !== false && unit.collision !== false && occupies(u, t)),
+  );
+}
+
+/** Verschiebt einen Ally während der Platzierung; steht dort schon ein (gleich großer) Ally, tauschen beide. */
 export function placeUnit(s: BattleState, id: string, pos: Pos): BattleState {
   if (s.phase !== 'platzierung') throw new RuleError('Platzieren ist nur vor dem Kampf möglich.');
   const unit = getUnit(s, id);
   if (!unit || unit.side !== 'ally') throw new RuleError('Nur Allys können platziert werden.');
   if (unit.lantern) throw new RuleError('Der Laternenträger steht fest.');
-  if (!placementArea(s).some((p) => samePos(p, pos))) throw new RuleError('Nur im Lichtkegel platzierbar.');
+  const area = placementArea(s);
+  if (!unitTiles(unit, pos).every((t) => area.some((a) => samePos(a, t)))) throw new RuleError('Nur im Lichtkegel platzierbar.');
   const other = unitAt(s, pos);
-  if (other && other.id !== id) {
-    if (other.side !== 'ally' || other.lantern) throw new RuleError('Das Feld ist belegt.');
+  if (other && other.id !== id && unit.collision !== false && other.collision !== false && other.pos && samePos(other.pos, pos)) {
+    if (other.side !== 'ally' || other.lantern || (other.size ?? 1) !== (unit.size ?? 1)) throw new RuleError('Das Feld ist belegt.');
+    if (!unit.pos) throw new RuleError('Das Feld ist belegt.');
     s = updateUnit(s, other.id, { pos: unit.pos });
+    return updateUnit(s, id, { pos });
   }
+  if (!canStand(s, unit, pos, area)) throw new RuleError('Das Feld ist belegt.');
   return updateUnit(s, id, { pos });
 }
 
@@ -231,7 +264,7 @@ function beginTurn(s: BattleState): BattleState {
     if (!unit.skipsTurns) break;
     queue = queue.slice(1);
   }
-  return { ...s, round, queue, turn: queue.length ? { unitId: queue[0], usedSlots: [] } : null };
+  return { ...s, round, queue, turn: queue.length ? { unitId: queue[0], used: {} } : null };
 }
 
 /** Bestätigt die Platzierung, legt die Initiative fest und startet Runde 1. */
@@ -245,13 +278,31 @@ export function startBattle(s: BattleState): BattleState {
 
 export const currentUnit = (s: BattleState) => (s.turn ? getUnit(s, s.turn.unitId) : undefined);
 
-/** Nutzt einen Aktionsplatz des aktuellen Zuges mit einer der dort erlaubten Fähigkeiten. */
-export function useActionSlot(s: BattleState, slot: number, abilityId: string): BattleState {
+export type ActionState = 'offen' | 'weiter' | 'verbraucht';
+
+/**
+ * Zustand einer Aktion im aktuellen Zug: offen (noch nichts gewählt), weiter (gewählte Fähigkeit hat
+ * noch Nutzungen) oder verbraucht. Ob die Kosten bezahlbar sind, prüft die Oberfläche zusätzlich.
+ */
+export function actionState(s: BattleState, action: number): ActionState {
+  const unit = currentUnit(s);
+  const used = s.turn?.used[action];
+  if (!unit || !used) return 'offen';
+  const max = unit.actions[action]?.abilities.find((a) => a.abilityId === used.abilityId)?.maxUses ?? 1;
+  return used.uses < max ? 'weiter' : 'verbraucht';
+}
+
+/** Nutzt eine Fähigkeit einer Aktion. Pro Zug ist jede Aktion auf eine Fähigkeit festgelegt. */
+export function useAction(s: BattleState, action: number, abilityId: string): BattleState {
   const unit = currentUnit(s);
   if (s.phase !== 'kampf' || !unit || !s.turn) throw new RuleError('Gerade ist niemand am Zug.');
-  if (s.turn.usedSlots.includes(slot)) throw new RuleError('Diese Aktion wurde in diesem Zug schon genutzt.');
-  if (!unit.actionSlots[slot]?.includes(abilityId)) throw new RuleError('Diese Fähigkeit ist hier nicht erlaubt.');
-  return { ...s, turn: { ...s.turn, usedSlots: [...s.turn.usedSlots, slot] } };
+  const entry = unit.actions[action]?.abilities.find((a) => a.abilityId === abilityId);
+  if (!entry) throw new RuleError('Diese Fähigkeit gehört nicht zu dieser Aktion.');
+  const used = s.turn.used[action];
+  if (used && used.abilityId !== abilityId) throw new RuleError('In dieser Aktion wurde schon eine andere Fähigkeit gewählt.');
+  if (used && used.uses >= entry.maxUses) throw new RuleError('Diese Aktion ist verbraucht.');
+  const next = { abilityId, uses: (used?.uses ?? 0) + 1 };
+  return { ...s, turn: { ...s.turn, used: { ...s.turn.used, [action]: next } } };
 }
 
 export function endTurn(s: BattleState): BattleState {
@@ -297,12 +348,12 @@ export function grantExtraTurn(s: BattleState, id: string): BattleState {
 
 /** Setzt eine Figur auf ein Feld (Grundlage für Bewegungs-Fähigkeiten). */
 export function moveUnit(s: BattleState, id: string, pos: Pos): BattleState {
-  const g = gridOf(s.map);
-  if (!g.isPassable(pos)) throw new RuleError('Das Feld ist nicht begehbar.');
-  const other = unitAt(s, pos);
-  if (other && other.id !== id) throw new RuleError('Das Feld ist belegt.');
   const unit = getUnit(s, id);
-  const facing = unit?.pos ? facingFromStep(unit.pos, pos, facingOf(unit)) : unit?.facing;
+  if (!unit) return s;
+  const g = gridOf(s.map);
+  if (!unitTiles(unit, pos).every((t) => g.isPassable(t))) throw new RuleError('Das Feld ist nicht begehbar.');
+  if (!canStand(s, unit, pos)) throw new RuleError('Das Feld ist belegt.');
+  const facing = unit.pos ? facingFromStep(unit.pos, pos, facingOf(unit)) : unit.facing;
   return checkOutcome(withExplored(updateUnit(s, id, { pos, facing })));
 }
 
@@ -341,7 +392,7 @@ export function checkOutcome(s: BattleState): BattleState {
     return { ...s, phase: 'niederlage', turn: null, outcome: `${unconscious} Allys sind bewusstlos.` };
   }
   // Siegfelder sind bis dahin gewöhnliche Felder; keiner wird zurückgelassen.
-  const onVictory = (u: Unit) => !!u.pos && s.map.victory.some((v) => samePos(v, u.pos!));
+  const onVictory = (u: Unit) => unitTiles(u).some((t) => s.map.victory.some((v) => samePos(v, t)));
   if (allies.length > 0 && allies.every(onVictory)) {
     return { ...s, phase: 'sieg', turn: null, outcome: 'Alle Allys haben ein Siegfeld erreicht.' };
   }

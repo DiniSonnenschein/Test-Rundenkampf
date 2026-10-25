@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createBattle, currentUnit, endTurn, grantExtraTurn, moveUnit, placeUnit, placementArea,
-  onTargeted, placementSnapshot, removeUnit, setSkipsTurns, setUnconscious, startBattle, turnUnit, useActionSlot, visible,
+  actionState, onTargeted, placementSnapshot, removeUnit, setSkipsTurns, setUnconscious, startBattle, turnUnit, useAction, visible,
   type BattleMap, type BattleState,
 } from './battle';
 import { areaTiles, facingFromStep, facingTowards, rotateOffset } from './facing';
@@ -103,16 +103,19 @@ describe('Kampfablauf', () => {
   const map: BattleMap = {
     width: 10, height: 10, blocked: ['4,2'], opaque: ['4,2'], victory: [{ x: 9, y: 9 }, { x: 8, y: 9 }], lanternStart: { x: 2, y: 2 },
   };
-  const slots = [['bewegen'], ['angriff', 'zauber']];
+  const actions = [
+    { name: 'Bewegen', abilities: [{ abilityId: 'bewegen', maxUses: 3 }] },
+    { name: 'Angriff', abilities: [{ abilityId: 'angriff', maxUses: 1 }, { abilityId: 'zauber', maxUses: 1 }] },
+  ];
   const setup = (rules: Rules = DEFAULT_RULES, previous?: Record<string, { dx: number; dy: number }>) =>
     createBattle({
       rules,
       map,
       allies: [
-        { id: 'laterne', name: 'Laterne', pos: null, lantern: {}, actionSlots: slots },
-        { id: 'ritter', name: 'Ritter', pos: null, actionSlots: slots },
+        { id: 'laterne', name: 'Laterne', pos: null, lantern: {}, actions },
+        { id: 'ritter', name: 'Ritter', pos: null, actions },
       ],
-      enemies: [{ id: 'goblin', name: 'Goblin', pos: { x: 9, y: 0 }, actionSlots: slots }],
+      enemies: [{ id: 'goblin', name: 'Goblin', pos: { x: 9, y: 0 }, actions }],
       previous,
     });
 
@@ -189,9 +192,15 @@ describe('Kampfablauf', () => {
     expect(s.round).toBe(1);
     expect(s.order).toEqual(['laterne', 'ritter', 'goblin']);
     expect(currentUnit(s)?.id).toBe('laterne');
-    s = useActionSlot(s, 1, 'zauber');
-    expect(() => useActionSlot(s, 1, 'angriff')).toThrow('schon genutzt');
-    expect(() => useActionSlot(s, 0, 'zauber')).toThrow('nicht erlaubt');
+    s = useAction(s, 1, 'zauber');
+    expect(actionState(s, 1)).toBe('verbraucht');
+    expect(() => useAction(s, 1, 'angriff')).toThrow('andere Fähigkeit');
+    expect(() => useAction(s, 1, 'zauber')).toThrow('verbraucht');
+    expect(() => useAction(s, 0, 'zauber')).toThrow('gehört nicht');
+    s = useAction(useAction(s, 0, 'bewegen'), 0, 'bewegen');
+    expect(actionState(s, 0)).toBe('weiter');
+    s = useAction(s, 0, 'bewegen');
+    expect(actionState(s, 0)).toBe('verbraucht');
     s = endTurn(s);
     expect(currentUnit(s)?.id).toBe('ritter');
     s = grantExtraTurn(s, 'ritter');
@@ -272,13 +281,42 @@ describe('Kampfablauf', () => {
   });
 });
 
+describe('Größe & Kollision', () => {
+  const map: BattleMap = { width: 8, height: 8, blocked: ['5,5'], opaque: [], victory: [{ x: 7, y: 7 }], lanternStart: { x: 3, y: 3 } };
+  const make = (extra: object = {}) =>
+    startBattle(createBattle({
+      rules: DEFAULT_RULES,
+      map,
+      allies: [{ id: 'a', name: 'A', pos: null, lantern: {}, actions: [] }],
+      enemies: [
+        { id: 'riese', name: 'Riese', pos: { x: 0, y: 0 }, size: 2, actions: [] },
+        { id: 'geist', name: 'Geist', pos: { x: 6, y: 0 }, collision: false, actions: [], ...extra },
+      ],
+    }));
+
+  it('Größe 2 belegt 2×2 Felder', () => {
+    const s = make();
+    expect(() => moveUnit(s, 'a', { x: 1, y: 1 })).toThrow('belegt');
+    expect(() => moveUnit(s, 'riese', { x: 4, y: 4 })).toThrow('nicht begehbar');
+    expect(moveUnit(s, 'riese', { x: 2, y: 5 }).units[1].pos).toEqual({ x: 2, y: 5 });
+  });
+
+  it('ohne Kollision teilt man sich Felder; Sieg zählt jedes belegte Feld', () => {
+    let s = make();
+    s = moveUnit(s, 'a', { x: 6, y: 0 });
+    expect(s.units[0].pos).toEqual({ x: 6, y: 0 });
+    s = moveUnit(s, 'a', { x: 7, y: 7 });
+    expect(s.phase).toBe('sieg');
+  });
+});
+
 describe('Züge rückgängig', () => {
   it('springt an den Beginn früherer Züge zurück', () => {
     const map: BattleMap = { width: 5, height: 5, blocked: [], opaque: [], victory: [], lanternStart: { x: 0, y: 0 } };
     let s = startBattle(createBattle({
       rules: DEFAULT_RULES, map,
-      allies: [{ id: 'a', name: 'A', pos: null, lantern: {}, actionSlots: [] }],
-      enemies: [{ id: 'g', name: 'G', pos: { x: 4, y: 4 }, actionSlots: [] }],
+      allies: [{ id: 'a', name: 'A', pos: null, lantern: {}, actions: [] }],
+      enemies: [{ id: 'g', name: 'G', pos: { x: 4, y: 4 }, actions: [] }],
     }));
     let h: BattleState[] = recordTurn([], s);
     s = moveUnit(s, 'a', { x: 1, y: 1 });
