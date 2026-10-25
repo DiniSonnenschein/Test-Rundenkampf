@@ -632,6 +632,16 @@ export function ShapeIcon({ shape, color, size = 32 }: { shape: string; color: s
   );
 }
 
+/** Form innerhalb einer anderen SVG-Zeichnung (z. B. auf der Map). */
+export function ShapeInSvg({ shape, color, x, y, size, opacity }: { shape: string; color: string; x: number; y: number; size: number; opacity?: number }) {
+  const def = SHAPES.find((s) => s.key === shape) ?? SHAPES[0];
+  return (
+    <svg x={x} y={y} width={size} height={size} viewBox="-50 -50 100 100" opacity={opacity} overflow="visible">
+      {def.render(color)}
+    </svg>
+  );
+}
+
 /** Formen-Auswahl nach Kategorien (ohne Beschriftung). */
 export function ShapePicker({ value, color, onChange }: { value: string; color: string; onChange: (key: string) => void }) {
   return (

@@ -82,7 +82,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 7 | Gegner & Gegner-KI | ✅ |
 | 8 | Objekte / Gegenstände | ✅ |
 | 9 | Geländearten | ✅ |
-| 10 | Level-Editor | ⬜ |
+| 10 | Level-Editor | ✅ |
 | 11 | Dungeon-Editor | ⬜ |
 | 12 | Neues Spiel (Setup) | ⬜ |
 | 13 | Spielmodus (Kampf-Oberfläche) | ⬜ |
@@ -465,15 +465,26 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - `src/screens/editors/TerrainEditor.tsx` (mit Schachbrett-Vorschau); in der Liste zeigt jede Geländeart ihre Farben
 
 ### 10 – Level-Editor
-**Ziel:** Maps bauen und befüllen.
-- Größe und Form der Map
-- Gelände „malen“, Gegner und Objekte platzieren
-- **Laternen-Startfeld** festlegen (dort beginnt der Laternenträger)
-- Startpositionen und **Blickrichtung** der Gegner
-- **Siegfelder** festlegen (Sieg, wenn alle Allys auf je einem Siegfeld stehen)
-- Bedienbarkeit auf dem Smartphone (Zoom, Scrollen, Touch-Werkzeuge)
+**Ziel:** Maps bauen und befüllen. Allys werden nicht im Level platziert (sie stellen sich vor Runde 1 im Lichtkegel auf).
 
-**Offene Punkte / Entscheidungen:** –
+**Level-Einstellungen** (im Eintrag):
+- **Größe:** Breite × Höhe frei (bis 40 × 40); beim Verkleinern fällt weg, was außerhalb liegt
+- **Grundboden** (Geländeart, mit der das Level gefüllt ist)
+- **Farben pro Level:** Standardfelder (2 Farben), Laternen-Startfeld (1), Siegfelder (2), Hintergrund / „kein Feld“ (1). Hell und dunkel ordnet der Editor im Schachbrett selbst zu. Andere Geländearten behalten ihre eigenen Farben.
+- **Vorschau** der Map, **Prüfung** (Warnungen: kein Grundboden, kein/nicht begehbares Laternen-Startfeld, keine Siegfelder, Siegfelder reichen für höchstens X Allys, Gegner auf nicht begehbarem Gelände, Dinge mit gelöschter Vorlage)
+- **Level testen** (Schnelltest mit Standard-Team) – folgt mit dem Spielmodus (Abschnitt 13)
+
+**Map-Editor** (Vollbild):
+- **Ein Finger** malt bzw. platziert, **zwei Finger** zoomen und verschieben (am Computer: Mausrad). Tipp-Aktionen werden erst beim Loslassen ausgeführt, damit der erste Finger eines Zooms nichts auslöst.
+- **Werkzeuge:** Malen (antippen/wischen) · Rechteck · Füllen (Farbeimer) – jeweils mit gewählter Geländeart oder **„Kein Feld“** (für nicht-rechteckige Maps) · Gegner platzieren · Objekt platzieren · Auswählen · Laternen-Startfeld (genau eines) · Siegfelder an/aus
+- **Auswählen:** verschieben, Gegner drehen (Blickrichtung), Patrouille (Wegpunkte antippen; Rundweg oder hin & zurück; letzten Punkt entfernen), Objekte „verborgen“ abweichend von der Vorlage (wie Vorlage / ja / nein), löschen. Liegen mehrere Dinge auf einem Feld, wählt erneutes Tippen das nächste.
+- **Rückgängig / Wiederholen**
+- **Pro Feld:** genau eine Geländeart, höchstens **ein Ding mit Kollision** (Objekt oder Gegner) und beliebig viele Dinge ohne Kollision.
+- Platzierte Exemplare nutzen die Vorlage; abweichend einstellbar sind nur Blickrichtung & Patrouille (Gegner) bzw. „verborgen“ (Objekte).
+
+**Umsetzung:**
+- `src/engine/level.ts` – Datenmodell, Malen/Rechteck/Füllen, Größe ändern, Platzierungsregeln, Prüfung (mit Tests)
+- `src/screens/editors/LevelEditor.tsx`, `src/screens/level/MapEditorScreen.tsx`, `src/screens/level/MapView.tsx`
 
 ### 11 – Dungeon-Editor
 **Ziel:** Level zu Dungeons aneinanderreihen.

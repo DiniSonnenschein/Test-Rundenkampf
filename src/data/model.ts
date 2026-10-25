@@ -2,6 +2,7 @@ import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
 import { DEFAULT_OBJECT, normalizeObject } from '../engine/objects';
+import { DEFAULT_LEVEL, normalizeLevel } from '../engine/level';
 import { DEFAULT_TERRAIN, normalizeTerrain } from '../engine/terrain';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
@@ -140,7 +141,14 @@ export const BAUSTEINE: CollectionDef[] = [
     ],
     subtitle: (e) => (e.fixed ? 'Fest · ' : '') + (normalizeResource(e).scope === 'global' ? 'Global' : 'Individuell'),
   },
-  { key: 'level', label: 'Level', singular: 'Level', newTitle: 'Neues Level', icon: '🗺️', creatable: true, section: 10 },
+  {
+    key: 'level', label: 'Level', singular: 'Level', newTitle: 'Neues Level', icon: '🗺️', creatable: true, section: 10,
+    defaults: () => structuredClone(DEFAULT_LEVEL) as unknown as Record<string, unknown>,
+    subtitle: (e) => {
+      const l = normalizeLevel(e);
+      return `${l.width}×${l.height} · ${l.enemies.length} Gegner`;
+    },
+  },
   { key: 'dungeons', label: 'Dungeons', singular: 'Dungeon', newTitle: 'Neuer Dungeon', icon: '🏰', creatable: true, section: 11 },
 ];
 

@@ -46,4 +46,5 @@ export const routes = {
   list: (key: string, folderId: string | null = null) =>
     folderId ? `liste/${key}/ordner/${encodeURIComponent(folderId)}` : `liste/${key}`,
   entry: (key: string, id: string) => `eintrag/${key}/${encodeURIComponent(id)}`,
+  map: (levelId: string) => `karte/${encodeURIComponent(levelId)}`,
 };
