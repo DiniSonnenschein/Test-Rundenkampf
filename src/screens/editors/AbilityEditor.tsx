@@ -283,6 +283,13 @@ const BLOCKS: { kind: AbilityBlock['kind']; label: string; create: () => Ability
   { kind: 'sammeln', label: 'Sammeln (in den Rucksack)', create: () => ({ kind: 'sammeln', extraCosts: [] }) },
   { kind: 'tragen', label: 'Tragen', create: () => ({ kind: 'tragen', extraCosts: [] }) },
   { kind: 'platzieren', label: 'Platzieren', create: () => ({ kind: 'platzieren', what: 'getragenes', selection: { ...ALL }, area: [], ignoresObstacles: false, extraCosts: [] }) },
+  { kind: 'objekt-verwenden', label: 'Objekt verwenden', create: () => ({ kind: 'objekt-verwenden', selection: { ...ALL }, extraCosts: [] }) },
+  { kind: 'objekt-geben', label: 'Objekt geben', create: () => ({ kind: 'objekt-geben', selection: { ...ALL }, extraCosts: [] }) },
+  { kind: 'objekt-werfen', label: 'Objekt werfen', create: () => ({ kind: 'objekt-werfen', selection: { ...ALL }, extraCosts: [] }) },
+  {
+    kind: 'aufdecken', label: 'Verborgenes aufdecken',
+    create: () => ({ kind: 'aufdecken', objekte: { on: true, typeIds: [] }, gegner: { on: true, typeIds: [] }, showRange: true, extraCosts: [] }),
+  },
   { kind: 'blickrichtung', label: 'Blickrichtung ändern', create: () => ({ kind: 'blickrichtung', who: 'ziel', mode: 'zu', direction: 'n', extraCosts: [] }) },
 ];
 
@@ -427,6 +434,42 @@ function BlockFields({ b, set }: { b: AbilityBlock; set: (b: AbilityBlock) => vo
           <Toggle label="Hindernisse ignorieren" checked={b.ignoresObstacles} onChange={(ignoresObstacles) => set({ ...b, ignoresObstacles })} />
         </>
       );
+    case 'objekt-verwenden':
+    case 'objekt-geben':
+    case 'objekt-werfen':
+      return (
+        <>
+          <p className="muted small">
+            {b.kind === 'objekt-verwenden' && 'Der Spieler wählt ein Objekt aus dem Rucksack bzw. Getragenes; es wirkt wie im Objekt unter „Verwendung“ festgelegt.'}
+            {b.kind === 'objekt-geben' && 'Das gewählte Objekt geht an das Ziel. Ist dessen Rucksack voll, trägt es das Objekt.'}
+            {b.kind === 'objekt-werfen' && 'Wie weit geworfen wird, bestimmt die Reichweite dieser Fähigkeit; was beim Aufprall passiert, legt das Objekt fest.'}
+          </p>
+          <SelectionPicker value={b.selection} collection="objekte" typeList={TO} allLabel="Jedes passende Objekt" onChange={(selection) => set({ ...b, selection })} />
+        </>
+      );
+    case 'aufdecken':
+      return (
+        <>
+          <p className="muted small">
+            Verborgene (durch Nebel, Effekt oder Einstellung) werden bis zum Ende des Levels mit ihrer echten Form angezeigt.
+          </p>
+          <Toggle label="Objekte" checked={b.objekte.on} onChange={(on) => set({ ...b, objekte: { ...b.objekte, on } })} />
+          {b.objekte.on && (
+            <div className="indent">
+              <span className="field-label">Nur bestimmte Typen (leer = alle)</span>
+              <TypePicker list={TO} value={b.objekte.typeIds} onChange={(typeIds) => set({ ...b, objekte: { ...b.objekte, typeIds } })} />
+              <Toggle label="Bereich ihrer Wirkungen mit aufdecken" checked={b.showRange} onChange={(showRange) => set({ ...b, showRange })} />
+            </div>
+          )}
+          <Toggle label="Gegner" checked={b.gegner.on} onChange={(on) => set({ ...b, gegner: { ...b.gegner, on } })} />
+          {b.gegner.on && (
+            <div className="indent">
+              <span className="field-label">Nur bestimmte Typen (leer = alle)</span>
+              <TypePicker list={TC} value={b.gegner.typeIds} onChange={(typeIds) => set({ ...b, gegner: { ...b.gegner, typeIds } })} />
+            </div>
+          )}
+        </>
+      );
     case 'blickrichtung':
       return (
         <>
@@ -464,28 +507,51 @@ function GlowFields({ label, value, set }: { label: string; value: { on: boolean
   );
 }
 
-export function AbilityEditor({ entry, set }: EditorProps) {
+/** Bausteine-Liste (auch für Objekt-Wirkungen). */
+export function AbilityBlocksList({ blocks, onChange, hint }: { blocks: AbilityBlock[]; onChange: (b: AbilityBlock[]) => void; hint?: string }) {
+  return (
+    <KindList<AbilityBlock>
+      title="Bausteine"
+      hint={hint ?? 'Wirken auf jedes Ziel (und alles im Radius). Zusatzkosten eines Bausteins werden zu den Grundkosten addiert.'}
+      items={blocks}
+      kinds={BLOCKS}
+      addLabel="Baustein"
+      onChange={onChange}
+      render={(b, setB) => (
+        <>
+          <BlockFields b={b} set={setB} />
+          <InlineCosts costs={b.extraCosts} set={(extraCosts) => setB({ ...b, extraCosts })} />
+        </>
+      )}
+    />
+  );
+}
+
+export function AbilityEditor({ entry, set, variant = 'faehigkeit' }: EditorProps & { variant?: 'faehigkeit' | 'objekt' }) {
   const a = normalizeAbility(entry);
+  const isAbility = variant === 'faehigkeit';
   const update = (patch: Partial<AbilityFields>) => set({ ...a, ...patch } as unknown as Partial<Entry>);
   const d = a.display;
 
   return (
     <>
-      <section className="card fields">
-        <h2>Einsatz</h2>
-        <Choice<'wahl' | 'zwang'>
-          value={a.mode}
-          options={[{ value: 'wahl', label: 'Wahl-Fähigkeit' }, { value: 'zwang', label: 'Zwang-Fähigkeit' }]}
-          onChange={(mode) => update({ mode })}
-        />
-        <p className="muted small">
-          {a.mode === 'wahl'
-            ? 'Wird als Möglichkeit angezeigt, sobald sie einsetzbar ist; man kann sich dafür oder dagegen entscheiden.'
-            : 'Muss eingesetzt werden, sobald sie einsetzbar ist; nur die Ziele dürfen noch gewählt werden.'}
-        </p>
-        <span className="field-label">Typen</span>
-        <TypePicker list={TA} value={a.typeIds} onChange={(typeIds) => update({ typeIds })} />
-      </section>
+      {isAbility && (
+        <section className="card fields">
+          <h2>Einsatz</h2>
+          <Choice<'wahl' | 'zwang'>
+            value={a.mode}
+            options={[{ value: 'wahl', label: 'Wahl-Fähigkeit' }, { value: 'zwang', label: 'Zwang-Fähigkeit' }]}
+            onChange={(mode) => update({ mode })}
+          />
+          <p className="muted small">
+            {a.mode === 'wahl'
+              ? 'Wird als Möglichkeit angezeigt, sobald sie einsetzbar ist; man kann sich dafür oder dagegen entscheiden.'
+              : 'Muss eingesetzt werden, sobald sie einsetzbar ist; nur die Ziele dürfen noch gewählt werden.'}
+          </p>
+          <span className="field-label">Typen</span>
+          <TypePicker list={TA} value={a.typeIds} onChange={(typeIds) => update({ typeIds })} />
+        </section>
+      )}
 
       <section className="card fields">
         <h2>Darstellung</h2>
@@ -504,15 +570,17 @@ export function AbilityEditor({ entry, set }: EditorProps) {
         <GlowFields label="Ziele leuchten kurz" value={d.targetGlow} set={(targetGlow) => update({ display: { ...d, targetGlow } })} />
       </section>
 
-      <KindList<AbilityTrigger>
-        title="Auslöser"
-        hint="Optional. Ausgelöste Fähigkeiten laufen als Reaktion (ohne Aktionsplatz). Ziele wählt weiterhin der Spieler; Wahl-Fähigkeiten können abgelehnt werden."
-        items={a.triggers}
-        kinds={TRIGGERS}
-        addLabel="Auslöser"
-        onChange={(triggers) => update({ triggers })}
-        render={(t, setT) => <TriggerFields trigger={t} set={setT} />}
-      />
+      {isAbility && (
+        <KindList<AbilityTrigger>
+          title="Auslöser"
+          hint="Optional. Ausgelöste Fähigkeiten laufen als Reaktion (ohne Aktionsplatz). Ziele wählt weiterhin der Spieler; Wahl-Fähigkeiten können abgelehnt werden."
+          items={a.triggers}
+          kinds={TRIGGERS}
+          addLabel="Auslöser"
+          onChange={(triggers) => update({ triggers })}
+          render={(t, setT) => <TriggerFields trigger={t} set={setT} />}
+        />
+      )}
 
       <TargetingCard t={a.targeting} set={(targeting) => update({ targeting })} />
 
@@ -560,20 +628,7 @@ export function AbilityEditor({ entry, set }: EditorProps) {
         <button className="btn" onClick={() => update({ costIncreases: [...a.costIncreases, { per: 'ziel', resourceId: null, amount: 1 }] })}>+ Steigerung</button>
       </section>
 
-      <KindList<AbilityBlock>
-        title="Bausteine"
-        hint="Wirken auf jedes Ziel (und alles im Radius). Zusatzkosten eines Bausteins werden zu den Grundkosten addiert."
-        items={a.blocks}
-        kinds={BLOCKS}
-        addLabel="Baustein"
-        onChange={(blocks) => update({ blocks })}
-        render={(b, setB) => (
-          <>
-            <BlockFields b={b} set={setB} />
-            <InlineCosts costs={b.extraCosts} set={(extraCosts) => setB({ ...b, extraCosts })} />
-          </>
-        )}
-      />
+      <AbilityBlocksList blocks={a.blocks} onChange={(blocks) => update({ blocks })} />
     </>
   );
 }

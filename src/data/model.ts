@@ -1,6 +1,7 @@
 import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
+import { DEFAULT_OBJECT, normalizeObject } from '../engine/objects';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
@@ -72,7 +73,14 @@ export const BAUSTEINE: CollectionDef[] = [
     key: 'gegner', label: 'Gegner', singular: 'Gegner', newTitle: 'Neuer Gegner', icon: '👹', visible: true, creatable: true, section: 7,
     defaults: () => ({ ...structuredClone(DEFAULT_CHARACTER), behavior: structuredClone(DEFAULT_BEHAVIOR) }) as unknown as Record<string, unknown>,
   },
-  { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
+  {
+    key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8,
+    defaults: () => structuredClone(DEFAULT_OBJECT) as unknown as Record<string, unknown>,
+    subtitle: (e) => {
+      const o = normalizeObject(e);
+      return [o.collectible && 'Sammelbar', o.use.usable && 'Verwendbar', o.hidden && 'Verborgen'].filter(Boolean).join(' · ');
+    },
+  },
   { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
   {
     key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5,

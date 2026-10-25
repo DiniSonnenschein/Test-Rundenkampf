@@ -99,7 +99,21 @@ export type AbilityBlockBody =
   | { kind: 'sammeln' }
   | { kind: 'tragen' }
   | { kind: 'platzieren'; what: 'getragenes' | 'rucksack'; selection: Selection; area: Area; ignoresObstacles: boolean }
-  | { kind: 'blickrichtung'; who: 'ziel' | 'anwender'; mode: 'zu' | 'weg' | 'richtung'; direction: 'n' | 'o' | 's' | 'w' };
+  | { kind: 'blickrichtung'; who: 'ziel' | 'anwender'; mode: 'zu' | 'weg' | 'richtung'; direction: 'n' | 'o' | 's' | 'w' }
+  /** Objekt aus dem Rucksack bzw. Getragenes verwenden (z. B. trinken, anziehen) – wirkt wie im Objekt festgelegt. */
+  | { kind: 'objekt-verwenden'; selection: Selection }
+  /** Objekt einem anderen Charakter geben; ist sein Rucksack voll, trägt er es. */
+  | { kind: 'objekt-geben'; selection: Selection }
+  /** Objekt werfen: Reichweite aus der Fähigkeit, Aufprall wie im Objekt festgelegt. */
+  | { kind: 'objekt-werfen'; selection: Selection }
+  /** Verborgene Objekte/Gegner (durch Nebel, Effekt oder Einstellung) werden bis Levelende mit ihrer echten Form angezeigt. */
+  | {
+      kind: 'aufdecken';
+      objekte: { on: boolean; typeIds: string[] };
+      gegner: { on: boolean; typeIds: string[] };
+      /** Bei Objekten zusätzlich den Bereich ihrer Wirkungen zeigen. */
+      showRange: boolean;
+    };
 
 export type AbilityBlock = AbilityBlockBody & { extraCosts: Cost[] };
 

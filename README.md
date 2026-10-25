@@ -80,7 +80,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 5 | Fähigkeiten | ✅ |
 | 6 | Allys | ✅ |
 | 7 | Gegner & Gegner-KI | ✅ |
-| 8 | Objekte / Gegenstände | ⬜ |
+| 8 | Objekte / Gegenstände | ✅ |
 | 9 | Geländearten | ⬜ |
 | 10 | Level-Editor | ⬜ |
 | 11 | Dungeon-Editor | ⬜ |
@@ -341,6 +341,10 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Tragen | alles ist tragbar, beliebig viel; Getragenes bleibt auf dem Feld des Anwenders |
 | Platzieren | Getragenes oder Objekte aus dem Rucksack; Zielort per Bereich; Hindernisse ignorieren ja/nein |
 | Blickrichtung ändern | Ziel oder Anwender dreht sich: zum anderen hin / von ihm weg / feste Richtung |
+| Objekt verwenden | ein Objekt aus dem Rucksack bzw. Getragenes (optional nur bestimmte/Typen) wirkt wie im Objekt unter „Verwendung“ festgelegt |
+| Objekt geben | an einen anderen Charakter; ist dessen Rucksack voll, trägt er es |
+| Objekt werfen | Reichweite aus der Fähigkeit, Aufprall wie im Objekt festgelegt |
+| Verborgenes aufdecken | verborgene Objekte/Gegner (ggf. Typen) – durch Nebel, Effekt oder Einstellung – werden bis Levelende mit ihrer echten Form angezeigt; bei Objekten optional auch der Bereich ihrer Wirkungen |
 
 Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender und Ziel.
 
@@ -414,17 +418,29 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 - Ausgeführt wird die KI im Spielmodus (Abschnitt 13).
 
 ### 8 – Objekte / Gegenstände
-**Ziel:** Sammelbare und nutzbare Gegenstände.
-- Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
-- **Stapelbar** in einem Rucksackplatz ja/nein (ggf. wie viele)
-- Typen: Verbrauchsgegenstände, Ausrüstung, Schlüssel/Quest-Objekte, Fallen, interaktive Map-Objekte (Truhen, Hebel)?
-- Wirkung über Effekte
-- **Wirft Schatten** (blockiert Licht/Sicht) – pro Objekt einstellbar
-- **Kollision** (ist Hindernis für Bewegung und Fähigkeiten) ja/nein
-- **Typen** (Liste „Objekte“)
-- Stapelbarkeit, Inventar (Team oder pro Charakter)
+**Ziel:** Alles, was kein Charakter ist – Gegenstände für den Rucksack und Dinge auf der Map.
 
-**Offene Punkte / Entscheidungen:** –
+**Grundsätzliches:** Darstellung (Form, Farbe, Größe) · Typen (Liste „Objekte“) · **Kollision** (Hindernis für Bewegung und Fähigkeiten) · **wirft Schatten** · **sammelbar** (Rucksack) · **tragbar** · **stapelbar** im Rucksack (max. pro Platz) · **verborgen** (sichtbar erst nach dem Aufdecken, dann bis Levelende)
+
+**Licht:** Lichtquelle mit Leuchtbereich (Bereichs-Auswahl, Blick nach oben); leuchtet auch getragen bzw. im Rucksack ja/nein.
+
+**Verwendung:** verwendbar ja/nein, wird dabei verbraucht ja/nein. Die Verwendung ist **wie eine Fähigkeit** aufgebaut (Darstellung, Zielwahl, Bedingungen, Kosten, Bausteine). **Anlegen** = Verwenden (z. B. Schwert gibt einen Effekt). **Abgelegt** ist ein Objekt, sobald es weder im Rucksack ist noch getragen wird.
+
+**Werfen** (Weite aus der Fähigkeit „Objekt werfen“): beim Aufprall bleibt es liegen / wird zerstört / wird verwandelt (in Ally/Gegner/Objekt) · ignoriert Hindernisse ja/nein · Geländeart am Aufprallort ändern · Effekte beim Aufprall über eine Wirkung „Objekt wird geworfen“.
+
+**Wirkungen** (mit „+“): verteilen bei einem Auslöser die **Bausteine einer Fähigkeit** (alle, auch Effekte) in einem Bereich ums Objekt – auch, wenn es verborgen ist:
+- Auslöser: Charakter (Allys/Gegner, Typen, mit Effekt) **betritt / verlässt** den Bereich oder steht zu **Beginn/Ende seines eigenen Zuges** darin · Objekt wird **gesammelt / verwendet / vergeben / geworfen**
+- Ziel: der Auslöser bzw. Träger oder alle im Bereich (AOE)
+- Vergebene Effekte enden beim Verlassen des Bereichs, beim Ablegen des Objekts oder durch nichts davon
+
+Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälter).
+
+**Rucksack:** Im Charakter-Editor wird angezeigt, wie viele Plätze die Start-Gegenstände belegen (stapelbare teilen sich Plätze); was nicht passt, wird getragen.
+
+**Umsetzung:**
+- `src/engine/objects.ts` – Datenmodell, Rucksackplätze (mit Tests)
+- `src/screens/editors/ObjectEditor.tsx` – die Verwendung nutzt den Fähigkeiten-Editor
+- Neue Fähigkeits-Bausteine: Objekt verwenden / geben / werfen, Verborgenes aufdecken
 
 ### 9 – Geländearten
 **Ziel:** Felder mit Eigenschaften und Effekten.

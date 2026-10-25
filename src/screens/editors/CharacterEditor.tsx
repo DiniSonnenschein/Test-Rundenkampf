@@ -5,6 +5,7 @@ import { useCollection } from '../../data/store';
 import {
   newCharacterResource, normalizeCharacter, type CharacterAction, type CharacterFields, type CharacterReaction, type CharacterResource,
 } from '../../engine/characters';
+import { normalizeObject, slotsNeeded } from '../../engine/objects';
 import { INITIATIVE_ID, normalizeResource } from '../../engine/resources';
 import { AreaPicker } from '../../ui/AreaPicker';
 import { useDialog } from '../../ui/Dialog';
@@ -141,6 +142,11 @@ export function CharacterEditor({ entry, set }: EditorProps) {
   const c = normalizeCharacter(entry);
   const update = (patch: Partial<CharacterFields>) => set({ ...c, ...patch } as unknown as Partial<Entry>);
   const items = c.startItems;
+  const objects = useCollection('objekte');
+  const usedSlots = items.reduce((sum, it) => {
+    const obj = objects.entries.find((e) => e.id === it.objectId);
+    return sum + (obj ? slotsNeeded(normalizeObject(obj), it.count) : 0);
+  }, 0);
 
   return (
     <>
@@ -151,7 +157,8 @@ export function CharacterEditor({ entry, set }: EditorProps) {
         <Toggle label="Kollision" hint="Ist ein Hindernis und belegt seine Felder" checked={c.collision} onChange={(collision) => update({ collision })} />
         <label className="field-label">Rucksackplätze</label>
         <Stepper value={c.backpackSlots} min={0} onChange={(backpackSlots) => update({ backpackSlots })} />
-        <span className="field-label">Start-Gegenstände</span>
+        <span className="field-label">Start-Gegenstände ({usedSlots} von {c.backpackSlots} Plätzen)</span>
+        {usedSlots > c.backpackSlots && <p className="small warn">Mehr Gegenstände als Rucksackplätze – der Rest wird getragen.</p>}
         {items.map((it, i) => (
           <div key={i} className="ability-row">
             <RefSelect

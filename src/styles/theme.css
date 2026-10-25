@@ -353,3 +353,7 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .shape-category { display: block; margin: 4px 0; font-size: .8rem; font-weight: 600; color: var(--text-muted); }
 .shape-picker .shape-grid { grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .shape-picker .shape-option { padding: 6px 0; }
+
+/* ---------- Abschnitt 8: Objekte ---------- */
+.nested-editor { display: flex; flex-direction: column; gap: var(--gap); padding-left: 10px; border-left: 3px solid var(--accent); }
+.warn { color: var(--gold); }
