@@ -6,6 +6,7 @@ import type { CharacterAction } from './characters';
 import { initiativeOrder } from './initiative';
 import { INITIATIVE_ID } from './resources';
 import { litTiles, visibleTiles, type LightSource } from './light';
+import type { ActiveEffect } from './effects';
 import type { Rules } from './rules';
 
 export type Side = 'ally' | 'enemy';
@@ -39,8 +40,27 @@ export interface Unit {
   size?: number;
   /** Ist ein Hindernis und belegt seine Felder (Standard: ja). */
   collision?: boolean;
-  /** Aktuelle Werte der individuellen Ressourcen (ID → Menge). */
+  /** Aktuelle Werte der individuellen Ressourcen (ID → Menge, ohne dauerhafte Effekt-Veränderungen). */
   values?: Record<string, number>;
+  /** Maximum je Ressource (null = keins). */
+  maxValues?: Record<string, number | null>;
+  /** Vorlage (Ally bzw. Gegner) im Spielmodus. */
+  templateId?: string;
+  typeIds?: string[];
+  effects?: ActiveEffect[];
+  items?: { objectId: string; count: number }[];
+  /** Werte ohne Effekte (für das Zurücksetzen, wenn Effekte enden). */
+  base?: { sightArea: Area; collision: boolean };
+  /** Wer ihn zuletzt angegriffen hat (für die Gegner-KI). */
+  lastAttackerId?: string;
+}
+
+/** Objekt auf der Map während des Spiels. */
+export interface MapObject {
+  id: string;
+  objectId: string;
+  pos: Pos;
+  hidden: boolean;
 }
 
 export interface BattleMap {
@@ -52,6 +72,10 @@ export interface BattleMap {
   opaque: string[];
   victory: Pos[];
   lanternStart: Pos;
+  /** Felder, die es nicht gibt („kein Feld“). */
+  voids?: string[];
+  /** Weitere Lichtquellen (Gelände, Objekte) mit Leuchtbereich (Blick nach oben). */
+  lights?: { pos: Pos; area: Area }[];
 }
 
 export interface Turn {
@@ -73,6 +97,11 @@ export interface BattleState {
   explored: string[];
   /** Grund für Sieg/Niederlage. */
   outcome?: string;
+  /** Spielmodus: Geländearten je Feld und Objekte. */
+  terrain?: Record<string, string>;
+  objects?: MapObject[];
+  /** Aufgedeckte (verborgene) Objekte/Gegner. */
+  revealed?: string[];
 }
 
 /** Platzierung relativ zum Laternenträger, um sie ins nächste Level zu übernehmen. */
@@ -123,7 +152,9 @@ export function visible(s: BattleState): Set<string> {
   const viewers = s.units
     .filter((u) => u.side === 'ally' && u.status === 'aktiv' && u.pos)
     .flatMap((u) => unitTiles(u).map((t) => ({ pos: t, tiles: areaTiles(t, u.sightArea ?? [], facingOf(u)) })));
-  return visibleTiles(gridOf(s.map), lightSources(s), viewers, s.rules.light.shape);
+  // Leuchtende Objekte/Gelände wirken wie ein Blick mit ihrem Leuchtbereich.
+  const lights = (s.map.lights ?? []).map((l) => ({ pos: l.pos, tiles: areaTiles(l.pos, l.area, 'n') }));
+  return visibleTiles(gridOf(s.map), lightSources(s), [...viewers, ...lights], s.rules.light.shape);
 }
 
 function withExplored(s: BattleState): BattleState {
