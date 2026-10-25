@@ -2,7 +2,13 @@
 import { useState } from 'react';
 import { newId, sortEntries } from '../../data/collection';
 import type { Entry } from '../../data/model';
-import { getCollection, useCollection } from '../../data/store';
+import { getCollection, saveEntry, useCollection } from '../../data/store';
+import { createEntry } from '../../data/collection';
+import { SPIELSTAENDE } from '../../data/model';
+import { createRun } from '../../engine/run';
+import { buildDefs } from '../../game/snapshot';
+import { navigate, routes } from '../../router';
+import { formatDate } from '../../ui/format';
 import { normalizeCharacter } from '../../engine/characters';
 import { normalizeDungeon } from '../../engine/dungeon';
 import { memberItems, memberResources, normalizeGame, validateGame, type GameContent, type GameFields, type TeamMember } from '../../engine/game';
@@ -117,6 +123,16 @@ export function GameEditor({ entry, set }: EditorProps) {
     levelName: (id) => levels.find((x) => x.id === id)?.title ?? '?',
   });
 
+  // Zu wenige Siegfelder verhindert den Start nicht (man kann trotzdem testen).
+  const blocking = warnings.filter((w) => !w.includes('Siegfelder'));
+
+  function start() {
+    const run = createRun(g, buildDefs(g));
+    const save = { ...createEntry(SPIELSTAENDE, null), title: `${entry.title} – ${formatDate(new Date().toISOString())}`, gameId: entry.id, run };
+    saveEntry(SPIELSTAENDE.key, save);
+    navigate(routes.game(save.id));
+  }
+
   async function addMember() {
     const items = sortEntries(getCollection('allys').entries).map((a) => ({ label: a.title, value: a.id }));
     if (!items.length) {
@@ -148,7 +164,7 @@ export function GameEditor({ entry, set }: EditorProps) {
         ) : (
           <p className="muted small">Bereit zum Start.</p>
         )}
-        <button className="btn btn-primary" disabled>Spiel starten (ab Abschnitt 13)</button>
+        <button className="btn btn-primary" disabled={blocking.length > 0} onClick={start}>Spiel starten</button>
         <p className="muted small">Beim Start wird automatisch ein Spielstand „Name – Datum“ angelegt und laufend gespeichert.</p>
       </section>
 

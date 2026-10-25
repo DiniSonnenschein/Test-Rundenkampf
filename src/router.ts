@@ -47,4 +47,5 @@ export const routes = {
     folderId ? `liste/${key}/ordner/${encodeURIComponent(folderId)}` : `liste/${key}`,
   entry: (key: string, id: string) => `eintrag/${key}/${encodeURIComponent(id)}`,
   map: (levelId: string) => `karte/${encodeURIComponent(levelId)}`,
+  game: (saveId: string) => `spiel/${encodeURIComponent(saveId)}`,
 };

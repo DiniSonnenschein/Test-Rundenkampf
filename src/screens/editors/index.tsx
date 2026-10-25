@@ -10,6 +10,7 @@ import { ObjectEditor } from './ObjectEditor';
 import { TerrainEditor } from './TerrainEditor';
 import { LevelEditor } from './LevelEditor';
 import { DungeonEditor } from './DungeonEditor';
+import { SaveEditor } from './SaveEditor';
 import { ResourceEditor } from './ResourceEditor';
 import { RulesEditor } from './RulesEditor';
 
@@ -28,6 +29,7 @@ export const EDITORS: Record<string, ComponentType<EditorProps>> = {
   gelaende: TerrainEditor,
   level: LevelEditor,
   dungeons: DungeonEditor,
+  spielstaende: SaveEditor,
   gegner: (props) => (
     <>
       <CharacterEditor {...props} />

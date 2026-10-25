@@ -85,7 +85,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 10 | Level-Editor | ✅ |
 | 11 | Dungeon-Editor | ✅ |
 | 12 | Neues Spiel (Setup) | ✅ |
-| 13 | Spielmodus (Kampf-Oberfläche) | ⬜ |
+| 13 | Spielmodus (Kampf-Oberfläche) | 🟦 13a fertig, 13b/13c offen |
 | 14 | Speichern & Laden | ⬜ |
 | 15 | Balancing-Werkzeuge | ⬜ |
 | 16 | Import / Export & Datenaustausch | ⬜ |
@@ -531,14 +531,33 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - `src/screens/editors/GameEditor.tsx`
 
 ### 13 – Spielmodus (Kampf-Oberfläche)
-**Ziel:** Den Kampf spielbar und verständlich darstellen.
-- Map-Anzeige, Charakterinfos, Zugreihenfolge
-- Auswahl von Bewegung, Fähigkeit, Gegenstand, Ziel
-- Kampf-Log (was ist passiert, welche Zahlen wurden berechnet?)
-- Gegnerzüge sichtbar/nachvollziehbar
-- Ende-Bildschirm bei „Run verloren“: beliebig viele Züge rückgängig machen, Level neu starten, zurück zum Menü
+**Ziel:** Alles spielbar machen. Umsetzung in drei Teilen:
+- **13a ✅** Spiel starten, Platzierung, Runden & Züge, Aktionen-Ring, Zielwahl, Bausteine Ressource/Effekt/Anwender bewegen/Ziel bewegen/Blickrichtung, Ressourcen-Events, Effekte (Dauer, dauerhafte Werte, Bewusstlos, Aussetzen, Sicht, Kollision), Nebel, Sieg/Niederlage, Rückgängig, Log
+- **13b** alle übrigen Bausteine, Effekt-Auslöser und -Beendigungen, Reaktionen, Objekt- und Gelände-Wirkungen, Gegner-KI
+- **13c** Dungeon-Ablauf mit Zwischenstationen (inkl. Händler), „Level testen“
 
-**Offene Punkte / Entscheidungen:** –
+**Bedienung (festgelegt):**
+- **Start:** „Spiel starten“ (Neues Spiel) legt automatisch einen Spielstand „Name – Datum“ an und speichert laufend. Das Spiel nutzt eine **Momentaufnahme aller Vorlagen** vom Start – spätere Änderungen in den Editoren wirken erst in einem neuen Spiel.
+- **Ansicht:** ein Finger verschiebt, zwei Finger zoomen; die Kamera springt zur Figur, die am Zug ist.
+- **Initiative-Leiste** oben (sichtbare Figuren; nicht sichtbare Gegner werden nicht angezeigt) und **globale Ressourcen** als Leiste.
+- **Platzierung:** Ally antippen, dann Feld im Lichtkegel; Blickrichtung wählbar; „Kampf beginnen“.
+- **Eigener Zug:** Um die Figur öffnet sich der **Aktionen-Ring** (✕ beendet den Zug). Eine Aktion antippen → ihre Fähigkeiten (Bedingungen nicht erfüllt = ausgeblendet, nicht bezahlbar/ohne Ziel = ausgegraut; nur eine Fähigkeit = direkt). Blickrichtung jederzeit änderbar.
+- **Zielwahl:** Reichweite und legale Ziele werden hervorgehoben; Ziele antippen; **Bestätigen** ist möglich, sobald die Mindestzahl erreicht ist (bei max. 1 Ziel sofort – außer bei Bewegung: dort erst Wegvorschau, dann Bestätigen). Kosten (inkl. Steigerung) werden angezeigt. AOE und Zufall ohne Zielwahl.
+- **Zwang-Fähigkeiten** starten zu Beginn des Zuges sofort (nur Zielwahl, kein Abbrechen).
+- **Legale Ziele** „Allys“/„Gegner“ gelten aus Sicht des Anwenders.
+- **Gegnerzüge** mit kurzer Pause (Knopf „Überspringen“); unsichtbare ohne Animation. *(KI folgt in 13b – bis dahin warten Gegner.)*
+- **Antippen einer Figur** zeigt Ressourcen-Balken, Effekte und Rucksack.
+- **Nebel:** nie gesehen = schwarz, erkundet = abgedunkelt (ohne Gegner), sichtbar = normal.
+- **Zug zurück** (↶) jederzeit; zurück an den Beginn des eigenen Zuges bzw. des vorherigen.
+- **Kampf-Log** (📜) mit allen Veränderungen.
+- **Ende:** Run verloren → Zug zurück / Level neu starten / Menü · Level geschafft → Weiter (bei Verzweigung Auswahl) · Run gewonnen → Zug zurück / Level noch einmal / Menü.
+- **Reaktionen** (13b): erscheinen wie Aktionen als Schalter am Charakter; mit ✕ überspringen; bei Zwang-Fähigkeiten direkt die Zielwahl.
+
+**Umsetzung (13a):**
+- `src/engine/status.ts` – Ressourcen, Events, Effekte und Zeitpunkte im Kampf
+- `src/engine/execute.ts` – Reichweite, legale Ziele, Bedingungen, Kosten, Hindernisse, Bausteine
+- `src/engine/run.ts` – Spielablauf, Levelwechsel, Rückgängig (mit Tests)
+- `src/game/snapshot.ts`, `src/screens/game/GameScreen.tsx`, `src/screens/game/GameMap.tsx`, `src/ui/usePanZoom.ts`
 
 ### 14 – Speichern & Laden
 **Ziel:** Spielstände jederzeit sichern und fortsetzen.

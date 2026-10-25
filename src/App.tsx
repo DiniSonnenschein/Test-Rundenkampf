@@ -4,6 +4,7 @@ import { CreateScreen } from './screens/CreateScreen';
 import { EntryScreen } from './screens/EntryScreen';
 import { ListScreen } from './screens/ListScreen';
 import { MapEditorScreen } from './screens/level/MapEditorScreen';
+import { GameScreen } from './screens/game/GameScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { StartScreen } from './screens/StartScreen';
 import { DialogProvider } from './ui/Dialog';
@@ -18,6 +19,7 @@ function Screen() {
   if (page === 'liste' && def) return <ListScreen key={`${key}/${b ?? ''}`} def={def} folderId={a === 'ordner' ? b : null} />;
   if (page === 'eintrag' && def && a) return <EntryScreen key={a} def={def} id={a} />;
   if (page === 'karte' && key) return <MapEditorScreen key={key} id={key} />;
+  if (page === 'spiel' && key) return <GameScreen key={key} id={key} />;
   return <StartScreen />;
 }
 

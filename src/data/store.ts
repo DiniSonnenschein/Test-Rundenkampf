@@ -43,8 +43,9 @@ export function updateCollection(key: string, fn: (col: Collection) => Collectio
   setCollection(key, fn(getCollection(key)));
 }
 
+/** Alle Sammlungen, in denen Verweise gepflegt werden. Spielstände sind eingefrorene Momentaufnahmen und bleiben unberührt. */
 export function allCollections(): Record<string, Collection> {
-  return Object.fromEntries(ALL_DEFS.map((d) => [d.key, getCollection(d.key)]));
+  return Object.fromEntries(ALL_DEFS.filter((d) => d.key !== 'spielstaende').map((d) => [d.key, getCollection(d.key)]));
 }
 
 export function useCollection(key: string): Collection {
