@@ -1,3 +1,4 @@
+import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
 
 // Gemeinsames Datenmodell aller Einträge im Erstell-Modus und unter „Neues Spiel“ / „Spielstand laden“.
@@ -17,6 +18,8 @@ export interface Entry {
   folderId: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Fester Eintrag: bearbeitbar, aber nicht löschbar. */
+  fixed?: boolean;
   [field: string]: unknown;
 }
 
@@ -46,6 +49,10 @@ export interface CollectionDef {
   section: number;
   /** Zusätzliche Startwerte neuer Einträge. */
   defaults?: () => Record<string, unknown>;
+  /** Feste Einträge, die immer existieren und nicht gelöscht werden können. */
+  fixedEntries?: () => Entry[];
+  /** Kurzinfo in der Liste (vor dem Datum). */
+  subtitle?: (entry: Entry) => string;
 }
 
 export const BAUSTEINE: CollectionDef[] = [
@@ -59,7 +66,24 @@ export const BAUSTEINE: CollectionDef[] = [
   { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
   { key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5 },
   { key: 'effekte', label: 'Effekte', singular: 'Effekt', newTitle: 'Neuer Effekt', icon: '🔥', creatable: true, section: 4 },
-  { key: 'ressourcen', label: 'Ressourcen', singular: 'Ressource', newTitle: 'Neue Ressource', icon: '💧', creatable: true, section: 3 },
+  {
+    key: 'ressourcen', label: 'Ressourcen', singular: 'Ressource', newTitle: 'Neue Ressource', icon: '💧', creatable: true, section: 3,
+    defaults: () => structuredClone(DEFAULT_RESOURCE) as unknown as Record<string, unknown>,
+    fixedEntries: () => [
+      {
+        id: INITIATIVE_ID,
+        title: 'Initiative',
+        note: 'Bestimmt die Reihenfolge innerhalb der Initiative-Reihe.',
+        folderId: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fixed: true,
+        ...structuredClone(DEFAULT_RESOURCE),
+        display: { show: false, color: '#e0a83a' },
+      },
+    ],
+    subtitle: (e) => (e.fixed ? 'Fest · ' : '') + (normalizeResource(e).scope === 'global' ? 'Global' : 'Individuell'),
+  },
   { key: 'level', label: 'Level', singular: 'Level', newTitle: 'Neues Level', icon: '🗺️', creatable: true, section: 10 },
   { key: 'dungeons', label: 'Dungeons', singular: 'Dungeon', newTitle: 'Neuer Dungeon', icon: '🏰', creatable: true, section: 11 },
 ];

@@ -45,7 +45,7 @@ export function EntryScreen({ def, id }: { def: CollectionDef; id: string }) {
     const action = await dialog.menu({
       items: [
         { label: 'Duplizieren', value: 'dup' },
-        { label: 'Löschen', value: 'delete', danger: true },
+        ...(entry!.fixed ? [] : [{ label: 'Löschen', value: 'delete', danger: true }]),
       ],
     });
     if (action === 'dup') navigate(routes.entry(def.key, actions.duplicate(entry!).id), true);

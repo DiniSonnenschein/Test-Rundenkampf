@@ -287,3 +287,16 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .light-preview figcaption { font-size: .75rem; text-align: center; margin-top: 6px; }
 
 .fixed-rules { margin: 0; padding-left: 1.2em; line-height: 1.5; }
+
+/* ---------- Abschnitt 3: Ressourcen ---------- */
+.stepper .btn-sign { width: 48px; font-size: 1.1rem; }
+.sub-card { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--bg-deep) 50%, transparent); }
+.sub-card-head { display: flex; align-items: center; justify-content: space-between; margin: -6px -6px -4px 0; }
+.sub-card-head .field-label { margin: 0; }
+.sub-card .field-label { margin-top: 2px; }
+
+.resource-bar-preview { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg-deep); }
+.resource-bar-label { font-size: .85rem; font-weight: 600; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resource-bar { flex: 1; height: 12px; border-radius: 6px; background: #ffffff18; overflow: hidden; }
+.resource-bar span { display: block; height: 100%; border-radius: 6px; }
+.resource-bar-value { font-variant-numeric: tabular-nums; font-size: .9rem; }

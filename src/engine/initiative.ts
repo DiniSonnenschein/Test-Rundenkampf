@@ -1,17 +1,10 @@
-// Initiative: wird zu Beginn jedes Levels einmal festgelegt und gilt für das ganze Level.
+// Initiative: wird zu Beginn jedes Levels anhand der Ressource „Initiative“ festgelegt
+// und gilt für das ganze Level (spätere Änderungen wirken erst im nächsten Level).
 import type { Rules } from './rules';
 
 export interface InitiativeUnit {
   id: string;
   side: 'ally' | 'enemy';
-}
-
-export function initiativeValue<U>(
-  unit: U,
-  criteria: Rules['initiative']['criteria'],
-  getValue: (unit: U, resourceId: string) => number,
-): number {
-  return criteria.reduce((sum, c) => (c.resourceId ? sum + getValue(unit, c.resourceId) * c.factor : sum), 0);
 }
 
 /**
@@ -21,9 +14,9 @@ export function initiativeValue<U>(
 export function initiativeOrder<U extends InitiativeUnit>(
   units: U[],
   rules: Rules['initiative'],
-  getValue: (unit: U, resourceId: string) => number,
+  getValue: (unit: U) => number,
 ): string[] {
-  const values = new Map(units.map((u) => [u.id, initiativeValue(u, rules.criteria, getValue)]));
+  const values = new Map(units.map((u) => [u.id, getValue(u)]));
   const distinct = [...new Set(values.values())].sort((a, b) => b - a);
   const order: string[] = [];
   for (const v of distinct) {

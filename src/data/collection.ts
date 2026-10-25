@@ -22,7 +22,9 @@ export function createEntry(def: CollectionDef, folderId: string | null, now = n
 
 export function duplicateEntry(entry: Entry, prefix: string, now = new Date()): Entry {
   const ts = now.toISOString();
-  return { ...structuredClone(entry), id: newId(prefix), title: `${entry.title} (Kopie)`, createdAt: ts, updatedAt: ts };
+  const copy: Entry = { ...structuredClone(entry), id: newId(prefix), title: `${entry.title} (Kopie)`, createdAt: ts, updatedAt: ts };
+  delete copy.fixed;
+  return copy;
 }
 
 export function compareTitles(a: string, b: string): number {

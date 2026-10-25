@@ -6,12 +6,6 @@
 export type LightShape = 'kreis' | 'quadrat';
 export type TieBreak = 'allys-zuerst' | 'gegner-zuerst' | 'abwechselnd';
 
-export interface InitiativeCriterion {
-  /** Ressource/Wert, der in die Initiative einfließt (ab Abschnitt 3). */
-  resourceId: string | null;
-  factor: number;
-}
-
 export interface Rules {
   /** Diagonale Bewegung erlaubt. */
   diagonal: boolean;
@@ -24,9 +18,8 @@ export interface Rules {
     /** Einmal gesehene Felder bleiben (ohne Figuren) aufgedeckt. */
     rememberExplored: boolean;
   };
+  /** Reihenfolge nach der festen Ressource „Initiative“; hier nur die Regel bei Gleichstand. */
   initiative: {
-    /** Initiative-Wert = Summe aus Wert × Faktor. */
-    criteria: InitiativeCriterion[];
     tieBreak: TieBreak;
   };
   /** Reguläre Züge pro Charakter und Runde. */
@@ -43,7 +36,7 @@ export const DEFAULT_RULES: Rules = {
   diagonal: true,
   cornerCutting: false,
   light: { lanternRadius: 3, shape: 'kreis', rememberExplored: true },
-  initiative: { criteria: [], tieBreak: 'allys-zuerst' },
+  initiative: { tieBreak: 'allys-zuerst' },
   turnsPerRound: 1,
   defeat: { unconsciousTurns: 2, unconsciousCount: 'alle' },
 };
@@ -61,7 +54,6 @@ export function normalizeRules(partial: unknown): Rules {
       rememberExplored: p.light?.rememberExplored ?? d.light.rememberExplored,
     },
     initiative: {
-      criteria: p.initiative?.criteria ?? [],
       tieBreak: p.initiative?.tieBreak ?? d.initiative.tieBreak,
     },
     turnsPerRound: p.turnsPerRound ?? d.turnsPerRound,

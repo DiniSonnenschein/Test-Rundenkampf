@@ -1,7 +1,7 @@
 // Zentraler Speicher im Arbeitsspeicher. Jede Änderung wird sofort auf dem Gerät gesichert.
 import { useSyncExternalStore } from 'react';
 import { storage } from './localStore';
-import { ALL_DEFS, type Collection, type Entry } from './model';
+import { ALL_DEFS, getDef, type Collection, type Entry } from './model';
 import { removeUsages } from './references';
 
 const cache = new Map<string, Collection>();
@@ -23,6 +23,11 @@ export function getCollection(key: string): Collection {
   if (!col) {
     const loaded = storage.load<Partial<Collection>>(key, {});
     col = { entries: loaded.entries ?? [], folders: loaded.folders ?? [] };
+    const missing = (getDef(key)?.fixedEntries?.() ?? []).filter((f) => !col!.entries.some((e) => e.id === f.id));
+    if (missing.length) {
+      col = { ...col, entries: [...missing, ...col.entries] };
+      storage.save(key, col);
+    }
     cache.set(key, col);
   }
   return col;
@@ -81,6 +86,7 @@ export function patchEntry(key: string, id: string, patch: Partial<Entry>) {
 
 /** Löscht einen Eintrag und entfernt alle Verweise darauf. */
 export function deleteEntry(key: string, id: string) {
+  if (getCollection(key).entries.find((e) => e.id === id)?.fixed) return;
   for (const [k, col] of Object.entries(removeUsages(allCollections(), id))) setCollection(k, col);
   updateCollection(key, (col) => ({ ...col, entries: col.entries.filter((e) => e.id !== id) }));
 }

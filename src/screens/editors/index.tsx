@@ -2,6 +2,7 @@
 import type { ComponentType } from 'react';
 import type { Entry } from '../../data/model';
 import { GameEditor } from './GameEditor';
+import { ResourceEditor } from './ResourceEditor';
 import { RulesEditor } from './RulesEditor';
 
 export interface EditorProps {
@@ -11,5 +12,6 @@ export interface EditorProps {
 
 export const EDITORS: Record<string, ComponentType<EditorProps>> = {
   regelwerke: RulesEditor,
+  ressourcen: ResourceEditor,
   spiele: GameEditor,
 };

@@ -1,6 +1,6 @@
 // Einfacher Service Worker, damit die App installiert werden kann und offline läuft.
 // Seiten: erst Netzwerk (für Updates), sonst Cache. Dateien: erst Cache, sonst Netzwerk.
-const CACHE = 'rundenkampf-v4';
+const CACHE = 'rundenkampf-v5';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

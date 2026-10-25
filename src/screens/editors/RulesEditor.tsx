@@ -1,12 +1,10 @@
 import { normalizeRules, type LightShape, type Rules, type TieBreak } from '../../engine/rules';
-import { useCollection } from '../../data/store';
-import { Choice, RefSelect, Stepper, Toggle } from '../../ui/fields';
+import { Choice, Stepper, Toggle } from '../../ui/fields';
 import type { EditorProps } from './index';
 import { LightPreview } from './LightPreview';
 
 export function RulesEditor({ entry, set }: EditorProps) {
   const rules = normalizeRules(entry.rules);
-  const ressourcen = useCollection('ressourcen');
   const update = (fn: (r: Rules) => Rules) => set({ rules: fn(structuredClone(rules)) });
 
   return (
@@ -52,30 +50,9 @@ export function RulesEditor({ entry, set }: EditorProps) {
       <section className="card fields">
         <h2>Initiative & Züge</h2>
         <p className="muted small">
-          Die Reihenfolge wird zu Beginn jedes Levels einmal festgelegt: höchster Initiative-Wert zuerst. Alle Gegner handeln mit, auch
-          unsichtbare.
+          Die Reihenfolge wird zu Beginn jedes Levels nach der Ressource „Initiative“ festgelegt: höchster Wert zuerst. Änderungen während
+          eines Levels wirken erst ab dem nächsten Level. Alle Gegner handeln mit, auch unsichtbare.
         </p>
-        <span className="field-label">Initiative-Wert = Summe aus</span>
-        {rules.initiative.criteria.map((c, i) => (
-          <div key={i} className="criterion">
-            <RefSelect
-              collection="ressourcen"
-              value={c.resourceId}
-              emptyLabel="– Wert wählen –"
-              onChange={(id) => update((r) => { r.initiative.criteria[i].resourceId = id; return r; })}
-            />
-            <div className="criterion-row">
-              <span className="muted">× Faktor</span>
-              <Stepper value={c.factor} step={0.1} bigStep={1} onChange={(v) => update((r) => { r.initiative.criteria[i].factor = v; return r; })} />
-              <button className="icon-btn" aria-label="Entfernen" onClick={() => update((r) => { r.initiative.criteria.splice(i, 1); return r; })}>✕</button>
-            </div>
-          </div>
-        ))}
-        {ressourcen.entries.length === 0 && <p className="muted small">Lege zuerst Ressourcen bzw. Werte an (z. B. „Initiative“), um sie hier zu nutzen.</p>}
-        <button className="btn" onClick={() => update((r) => { r.initiative.criteria.push({ resourceId: null, factor: 1 }); return r; })}>
-          + Wert hinzufügen
-        </button>
-
         <span className="field-label">Bei Gleichstand</span>
         <Choice<TieBreak>
           value={rules.initiative.tieBreak}

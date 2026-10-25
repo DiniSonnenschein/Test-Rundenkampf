@@ -15,6 +15,7 @@ export function useEntryActions(def: CollectionDef) {
   }
 
   async function remove(entry: Entry): Promise<boolean> {
+    if (entry.fixed) return false;
     const usages = findUsages(allCollections(), entry.id);
     const ok = await dialog.confirm({
       title: `„${entry.title || 'Ohne Titel'}“ löschen?`,

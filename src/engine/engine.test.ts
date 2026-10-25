@@ -7,6 +7,7 @@ import { recordTurn, undoTurns } from './history';
 import { distance, hasLineOfSight, neighbors, posKey, reachable, type Grid } from './grid';
 import { initiativeOrder } from './initiative';
 import { litTiles } from './light';
+import { INITIATIVE_ID } from './resources';
 import { DEFAULT_RULES, normalizeRules, type Rules } from './rules';
 
 const rulesWith = (defeat: Partial<Rules['defeat']>) => normalizeRules({ defeat: { ...DEFAULT_RULES.defeat, ...defeat } });
@@ -66,16 +67,15 @@ describe('Initiative', () => {
     { id: 'g2', side: 'enemy' as const, v: 3 },
   ];
   const get = (u: { v: number }) => u.v;
-  const criteria = [{ resourceId: 'tempo', factor: 1 }];
 
   it('höchster Wert zuerst, Gleichstand nach Regel', () => {
-    expect(initiativeOrder(units, { criteria, tieBreak: 'allys-zuerst' }, get)).toEqual(['a1', 'g1', 'a2', 'g2']);
-    expect(initiativeOrder(units, { criteria, tieBreak: 'gegner-zuerst' }, get)).toEqual(['g1', 'a1', 'g2', 'a2']);
+    expect(initiativeOrder(units, { tieBreak: 'allys-zuerst' }, get)).toEqual(['a1', 'g1', 'a2', 'g2']);
+    expect(initiativeOrder(units, { tieBreak: 'gegner-zuerst' }, get)).toEqual(['g1', 'a1', 'g2', 'a2']);
   });
 
-  it('ohne Kriterien: Allys, dann Gegner bzw. abwechselnd', () => {
-    expect(initiativeOrder(units, { criteria: [], tieBreak: 'allys-zuerst' }, get)).toEqual(['a1', 'a2', 'g1', 'g2']);
-    expect(initiativeOrder(units, { criteria: [], tieBreak: 'abwechselnd' }, get)).toEqual(['a1', 'g1', 'a2', 'g2']);
+  it('alle gleich: Allys, dann Gegner bzw. abwechselnd', () => {
+    expect(initiativeOrder(units, { tieBreak: 'allys-zuerst' }, () => 0)).toEqual(['a1', 'a2', 'g1', 'g2']);
+    expect(initiativeOrder(units, { tieBreak: 'abwechselnd' }, () => 0)).toEqual(['a1', 'g1', 'a2', 'g2']);
   });
 });
 
@@ -128,6 +128,16 @@ describe('Kampfablauf', () => {
   it('die Laterne brennt auch, wenn der Träger bewusstlos ist', () => {
     const s = setUnconscious(startBattle(setup()), 'laterne', true);
     expect(visible(s).has('2,4')).toBe(true);
+  });
+
+  it('Initiative aus der Ressource; Änderungen im Level ändern die Reihenfolge nicht', () => {
+    const base = setup();
+    let s = startBattle({ ...base, units: base.units.map((u) => (u.id === 'goblin' ? { ...u, values: { [INITIATIVE_ID]: 9 } } : u)) });
+    expect(s.order).toEqual(['goblin', 'laterne', 'ritter']);
+    s = { ...s, units: s.units.map((u) => (u.id === 'ritter' ? { ...u, values: { [INITIATIVE_ID]: 20 } } : u)) };
+    s = endTurn(endTurn(endTurn(s)));
+    expect(s.round).toBe(2);
+    expect(currentUnit(s)?.id).toBe('goblin');
   });
 
   it('Runden, Züge und Aktionsplätze', () => {

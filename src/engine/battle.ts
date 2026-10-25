@@ -2,6 +2,7 @@
 // Der Zustand ist reines JSON (für Spielstände); alle Funktionen liefern einen neuen Zustand.
 import { inBounds, posKey, samePos, type Grid, type Pos } from './grid';
 import { initiativeOrder } from './initiative';
+import { INITIATIVE_ID } from './resources';
 import { litTiles, visibleTiles, type LightSource } from './light';
 import type { Rules } from './rules';
 
@@ -26,7 +27,7 @@ export interface Unit {
   turnsPerRound?: number;
   /** Aktionsplätze eines Zuges; jeder Platz bietet eine Auswahl an Fähigkeiten (IDs). */
   actionSlots: string[][];
-  /** Werte für Initiative u. Ä. (ab Abschnitt 3 aus Ressourcen). */
+  /** Aktuelle Werte der individuellen Ressourcen (ID → Menge). */
   values?: Record<string, number>;
 }
 
@@ -224,7 +225,7 @@ export function startBattle(s: BattleState): BattleState {
   if (s.phase !== 'platzierung') throw new RuleError('Der Kampf läuft bereits.');
   if (s.units.some((u) => u.side === 'ally' && !u.pos)) throw new RuleError('Es sind noch nicht alle Allys platziert.');
   const placed = s.units.filter((u) => u.pos);
-  const order = initiativeOrder(placed, s.rules.initiative, (u, res) => u.values?.[res] ?? 0);
+  const order = initiativeOrder(placed, s.rules.initiative, (u) => u.values?.[INITIATIVE_ID] ?? 0);
   return checkOutcome(beginTurn({ ...s, phase: 'kampf', order, round: 0, queue: [] }));
 }
 

@@ -75,7 +75,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 0 | Technische Grundlagen | ✅ |
 | 1 | App-Gerüst & Navigation (Startbildschirm) | ✅ |
 | 2 | Kampfregeln – der Kern | ✅ |
-| 3 | Ressourcen & Attribute | ⬜ |
+| 3 | Ressourcen & Attribute | ✅ |
 | 4 | Effekte | ⬜ |
 | 5 | Fähigkeiten | ⬜ |
 | 6 | Allys | ⬜ |
@@ -163,7 +163,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - **Nebel & Laterne:** Ohne Licht sieht man (fast) kein Feld. Licht bringen Licht-Fähigkeiten; die **Laterne** ist fest verankert: In jedem Team gibt es einen **Laternenträger**, der jedes Level auf einem vorgegebenen Feld beginnt und dort nicht verschoben werden kann. Die Laterne brennt auch, wenn ihr Träger bewusstlos ist.
 - **Schatten** werfen nur Objekte/Gelände, die bei ihrer Erstellung als schattenwerfend festgelegt wurden. Wie weit ein Charakter ohne Licht sieht (**Eigensicht**), wird bei der Charaktererstellung festgelegt.
 - **Platzierung vor Runde 1:** Alle übrigen Allys werden frei innerhalb des Lichtkegels platziert und können bis zur Bestätigung beliebig verschoben (bzw. getauscht) werden. Im nächsten Level wird die Platzierung relativ zum Laternenträger wiederholt, soweit möglich (sonst nächstes freies Feld im Licht), und kann erneut angepasst werden.
-- **Initiative:** wird zu Beginn jedes Levels anhand von Werten festgelegt und gilt für das ganze Level. Unterschiedliche Geschwindigkeiten spielen keine Rolle. Pro Runde hat jeder Charakter regulär einen Zug; zusätzliche Züge (z. B. Reaktionen) sind möglich.
+- **Initiative:** wird zu Beginn jedes Levels anhand der festen Ressource „Initiative“ festgelegt (höchster Wert zuerst) und gilt für das ganze Level. Unterschiedliche Geschwindigkeiten spielen keine Rolle. Pro Runde hat jeder Charakter regulär einen Zug; zusätzliche Züge (z. B. Reaktionen) sind möglich.
 - **Züge bestehen aus Aktionen:** Jede Aktion (auch Bewegung) ist eine Fähigkeit. Jeder Charakter hat **Aktionsplätze**, die jeweils eine Auswahl an Fähigkeiten anbieten (z. B. A: Platz 1 = Bewegung, Platz 2 = Angriff *oder* Zauber; B: Platz 1 = Bewegung *oder* Angriff, Platz 2 = Zauber). Details in Abschnitt 5.
 - **Sieg:** sobald **alle** Allys auf je einem **Siegfeld** stehen – auch bewusstlose (keiner wird zurückgelassen; ein bewusstloser Charakter muss z. B. getragen werden). Bis dahin sind Siegfelder gewöhnliche Felder: Sie können wieder verlassen werden, man kann darauf angreifen und angegriffen werden.
 - **Niemand stirbt.** „Bewusstlos“ ist ein **fester Effekt** (Abschnitt 4), der z. B. bei 0 LP eintritt. Bewusstlose verpassen ihre Züge.
@@ -178,7 +178,6 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | Laternen-Radius (Standard, je Ally später abweichend möglich) | 3 |
 | Form des Lichtkegels (Kreis / Quadrat) | Kreis |
 | Erkundete Felder bleiben aufgedeckt (Gelände ja, Figuren nein) | an |
-| Initiative-Wert = Summe aus (Wert × Faktor), Werte aus den Ressourcen | – |
 | Bei Initiative-Gleichstand: Allys zuerst / Gegner zuerst / abwechselnd | Allys zuerst |
 | Züge pro Charakter und Runde | 1 |
 | Run verloren, wenn ein Ally so viele eigene Züge am Stück bewusstlos ist (gilt auch für den Laternenträger; 0 = aus) | 2 |
@@ -199,13 +198,46 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 
 ### 3 – Ressourcen & Attribute
 **Ziel:** Frei definierbare Werte, mit denen Charaktere und Fähigkeiten arbeiten.
-- Ressourcen anlegen (z. B. LP, Mana, Ausdauer, Wut, Gold) mit Min/Max, Startwert, Regeneration
-- Lebenspunkte sind eine normale Ressource; wann „Bewusstlos“ eintritt (z. B. LP = 0), legt der feste Effekt fest (Abschnitt 4)
-- Ressourcen/Werte liefern die Grundlage für den Initiative-Wert (Abschnitt 2)
-- Attribute/Stats (z. B. Stärke, Verteidigung, Tempo) – fest vorgegeben oder frei definierbar?
-- Teamweite vs. charakterbezogene Ressourcen
 
-**Offene Punkte / Entscheidungen:** –
+**Grundregeln:**
+- **Alle Stats sind Ressourcen** (z. B. LP, Mana, Stärke). Allys und Gegner nutzen dieselben Ressourcen.
+- Nur **ganze Zahlen**. **Minimum immer 0.** Ein Minus vor einer Zahl bedeutet „verringern“ (±-Knopf am Zahlenfeld).
+- Ressourcen verändern sich immer nur um **± einen Betrag**; zwischen Leveln wird nichts automatisch zurückgesetzt – Werte laufen über den ganzen Run weiter.
+- Ob eine **Fähigkeit** das Maximum überschreiten darf, legt die Fähigkeit fest. **Automatische Veränderungen** überschreiten das Maximum nie.
+- Sonstige Veränderungen (z. B. durch Fähigkeiten) werden dort festgelegt. Weiterer Schutz läuft über Effekte und Gegenstände.
+
+**Feste Ressource „Initiative“:** existiert immer, ist bearbeitbar, aber **nicht löschbar**. Der Wert jedes Charakters bestimmt seine Position in der Initiative-Reihe (höchster zuerst; Gleichstand regelt das Regelwerk). Ändert sich der Wert während eines Levels, bleibt die Reihenfolge; der neue Wert gilt **ab dem nächsten Level**.
+
+**Beim Anlegen einer Ressource – zuerst die Art:**
+
+*Globale Ressource* (Pool, auf den alle Allys Zugriff haben):
+| Einstellung | Inhalt |
+|---|---|
+| Maximum | ja/nein, ggf. Höhe |
+| Startwert | Menge zu Beginn des Spiels |
+| Automatische Veränderungen | beliebig viele (+): pro **Runde** oder **Level**, **zu Beginn** oder **am Ende**, ±Wert |
+| Anpassung durch Fähigkeiten | beliebig viele (+): Fähigkeit (bzw. Kategorie) → ±Wert |
+| Events | beliebig viele (+), s. u. Folgen: Run gewonnen · Run verloren · Effekt auf alle Allys · Effekt auf alle Gegner · andere globale Ressource ±Wert |
+
+*Individuelle Ressource* (an einen Charakter gebunden):
+| Einstellung | Inhalt |
+|---|---|
+| Anzeige | ein/aus: beim **Antippen der Figur** als Balken mit Zahl (z. B. 4/10) |
+| Farbe | über das Farbrad |
+| Events | beliebig viele (+), s. u. Folgen: Run gewonnen · Run verloren · Charakter erhält Effekt (für X Runden / unendlich / bis zur Auflösung) · andere Ressource desselben Charakters ±Wert |
+
+**Pro Charakter** (Abschnitte 6/7) werden für individuelle Ressourcen festgelegt: Maximum, Startwert, automatische Veränderungen (pro **Zug**, Runde oder Level; zu Beginn/am Ende; ±Wert; mehrfach) und Anpassungen durch Fähigkeiten.
+
+**Anpassung durch Fähigkeiten:** verändert den **Betrag** der Wirkung, z. B. Angriff −8 LP mit Anpassung −5 → −3 LP (wirkt wie 5 Verteidigung); Heilung +6 mit −2 → +4. Die Wirkung kippt nie um (endet bei 0). Gilt für eine Fähigkeit oder eine **Fähigkeiten-Kategorie** (Kategorien folgen in Abschnitt 5).
+
+**Events:** Grenzwert + Richtung („fällt auf/unter“ bzw. „steigt auf/über“). Ein Event löst **jedes Mal** aus, wenn die Grenze (erneut) erreicht bzw. überschritten wird. Beliebig viele Events pro Ressource.
+
+**Anzeige im Kampf:** Antippen einer Figur zeigt ihre Ressourcen-Balken; globale Ressourcen stehen dauerhaft in einer Leiste am oberen Bildschirmrand.
+
+**Umsetzung:**
+- `src/engine/resources.ts` – Typen und Rechenregeln (Veränderung mit Min/Max, Anpassung, Event-Auslösung) mit Tests
+- `src/screens/editors/ResourceEditor.tsx` – Editor; die Bausteine „Automatische Veränderung“ und „Anpassung durch Fähigkeiten“ werden in der Charaktererstellung wiederverwendet
+- Regelwerk: Initiative kommt jetzt direkt aus der Ressource „Initiative“; dort bleibt nur die Gleichstand-Regel
 
 ### 4 – Effekte
 **Ziel:** Wiederverwendbare Wirkungen als Bausteine für Fähigkeiten, Objekte und Gelände.
@@ -234,7 +266,8 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 ### 6 – Allys
 **Ziel:** Spielbare Charaktere anlegen.
 - ~~Name, Bild/Symbol~~ → bereits vorhanden: Titel, Notiz, Form, Farbe, Größe (Abschnitt 1)
-- Attribute, Ressourcen, Fähigkeiten, Aktionsplätze
+- Ressourcen je Charakter: Maximum, Startwert, automatische Veränderungen (pro Zug/Runde/Level), Anpassungen durch Fähigkeiten; Initiative-Wert
+- Fähigkeiten, Aktionsplätze
 - Laterne: Kann der Ally Laternenträger sein? Eigener Laternen-Radius?
 - **Eigensicht** ohne Licht (Radius, 0 = nur eigenes Feld)
 - Zusätzliche Züge pro Runde / Reaktionen
