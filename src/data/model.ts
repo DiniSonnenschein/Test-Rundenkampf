@@ -3,6 +3,7 @@ import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
 import { DEFAULT_OBJECT, normalizeObject } from '../engine/objects';
 import { normalizeDungeon } from '../engine/dungeon';
+import { DEFAULT_GAME, normalizeGame } from '../engine/game';
 import { DEFAULT_LEVEL, normalizeLevel } from '../engine/level';
 import { DEFAULT_TERRAIN, normalizeTerrain } from '../engine/terrain';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
@@ -162,7 +163,12 @@ export const BAUSTEINE: CollectionDef[] = [
 
 export const SPIELE: CollectionDef = {
   key: 'spiele', label: 'Neues Spiel', singular: 'Spiel', newTitle: 'Neues Spiel', icon: '▶️', creatable: true, section: 12,
-  defaults: () => ({ regelwerkId: null }),
+  defaults: () => structuredClone(DEFAULT_GAME) as unknown as Record<string, unknown>,
+  subtitle: (e) => {
+    const g = normalizeGame(e);
+    const what = { dungeon: 'Dungeon', level: 'Level', levels: 'Level-Folge' }[g.content.kind];
+    return `${what} · ${g.team.length === 1 ? '1 Ally' : `${g.team.length} Allys`}`;
+  },
 };
 
 export const SPIELSTAENDE: CollectionDef = {

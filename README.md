@@ -84,7 +84,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 9 | Geländearten | ✅ |
 | 10 | Level-Editor | ✅ |
 | 11 | Dungeon-Editor | ✅ |
-| 12 | Neues Spiel (Setup) | ⬜ |
+| 12 | Neues Spiel (Setup) | ✅ |
 | 13 | Spielmodus (Kampf-Oberfläche) | ⬜ |
 | 14 | Speichern & Laden | ⬜ |
 | 15 | Balancing-Werkzeuge | ⬜ |
@@ -512,15 +512,23 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - `src/screens/editors/DungeonEditor.tsx`
 
 ### 12 – Neues Spiel (Setup)
-**Ziel:** Testlauf konfigurieren und starten.
-- Liste der Spiel-Konfigurationen mit Ordnern/Suche/Duplizieren existiert bereits (Abschnitt 1)
-- Auswahl: Dungeon oder einzelne Level
-- Regelwerk wählen (bereits vorhanden, Abschnitt 2)
-- Team zusammenstellen (Anzahl Allys?), Laternenträger bestimmen
-- Startgegenstände festlegen
-- ggf. Test-Optionen (z. B. Gegner-Stärke-Multiplikator, Zufall fixieren)
+**Ziel:** Testlauf konfigurieren und starten. „Neues Spiel“ ist eine Liste von **Spiel-Konfigurationen** (Ordner, Suche, Duplizieren) – so kann derselbe Test beliebig oft neu gestartet und variiert werden.
 
-**Offene Punkte / Entscheidungen:** –
+**Was wird gespielt** (individuell): ein **Dungeon** · ein **einzelnes Level** · eine **eigene Level-Folge** (ohne Zwischenstationen, Level auch mehrfach). Dazu das **Regelwerk** (ohne Auswahl: Standard-Regeln).
+
+**Team:** beliebig groß, Allys auch **mehrfach**; die **Reihenfolge** entscheidet bei Initiative-Gleichstand unter Allys. **Genau einer trägt die Laterne** (der erste hinzugefügte automatisch, per Knopf änderbar).
+
+**Anpassungen nur für diesen Test** (ändern die Editoren nicht): pro Team-Mitglied Start- und Maximalwerte der Ressourcen sowie die Start-Gegenstände; Startwerte der **globalen Ressourcen**. „Auf Editor-Werte zurücksetzen“ verwirft die Anpassungen.
+
+**Stufen/Fortschritt:** kein eigenes System – wird über Ressourcen + Events + Effekte abgebildet (z. B. „EP steigt auf 10 → Effekt *Stufe 2*“).
+
+**Prüfung:** kein Inhalt gewählt, fehlende Level, leeres Team, gelöschter Ally, kein Laternenträger, Level mit weniger Siegfeldern als Allys.
+
+**Start:** „Spiel starten“ legt automatisch einen Spielstand „Name – Datum, Uhrzeit“ an, der laufend automatisch gespeichert wird (folgt mit Abschnitt 13).
+
+**Umsetzung:**
+- `src/engine/game.ts` – Datenmodell, Anpassungen anwenden, Prüfung (mit Tests)
+- `src/screens/editors/GameEditor.tsx`
 
 ### 13 – Spielmodus (Kampf-Oberfläche)
 **Ziel:** Den Kampf spielbar und verständlich darstellen.
