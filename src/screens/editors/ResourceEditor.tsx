@@ -147,7 +147,7 @@ export function AdjustmentsCard({ adjustments, onChange }: { adjustments: Adjust
       <h2>Anpassung durch Fähigkeiten</h2>
       <p className="muted small">
         Verändert den Betrag, um den eine Fähigkeit diese Ressource verändert: −5 bei „Angriff“ wirkt wie 5 Verteidigung. Die Wirkung kippt
-        nie um (endet bei 0). Fähigkeiten-Kategorien folgen in Abschnitt 5.
+        nie um (endet bei 0).
       </p>
       {adjustments.map((a, i) => (
         <div key={i} className="sub-card">

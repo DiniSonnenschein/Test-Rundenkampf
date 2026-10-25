@@ -332,3 +332,9 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .type-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .type-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .type-list li span { flex: 1; }
+
+/* ---------- Abschnitt 5: Fähigkeiten ---------- */
+.card h3 { margin: 14px 0 0; font-size: 1.05rem; }
+.indent { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 6px; padding-left: 12px; border-left: 2px solid var(--border); }
+.inline-costs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.inline-costs .btn-row .btn { min-height: 40px; }

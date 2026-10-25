@@ -51,7 +51,9 @@ export type EffectBlock =
   | { kind: 'hindernis-ignorieren'; category: EntityKind | 'gelaende'; selection: Selection }
   | { kind: 'unveraenderlich'; resourceId: string | null; by: ChangeSource; typeIds: string[] }
   /** Nicht wahrnehmbar für alle bzw. bestimmte Charaktere (AOE trifft trotzdem). */
-  | { kind: 'unsichtbar'; selection: Selection };
+  | { kind: 'unsichtbar'; selection: Selection }
+  /** Keine Kollision: kann Felder mit anderen teilen und gilt nicht als Hindernis; bleibt anvisierbar. */
+  | { kind: 'keine-kollision' };
 
 // ---------- Auslöser & Beendigung ----------
 

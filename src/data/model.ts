@@ -1,3 +1,4 @@
+import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
@@ -65,7 +66,15 @@ export const BAUSTEINE: CollectionDef[] = [
   { key: 'gegner', label: 'Gegner', singular: 'Gegner', newTitle: 'Neuer Gegner', icon: '👹', visible: true, creatable: true, section: 7 },
   { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
   { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
-  { key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5 },
+  {
+    key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5,
+    defaults: () => structuredClone(DEFAULT_ABILITY) as unknown as Record<string, unknown>,
+    subtitle: (e) => {
+      const a = normalizeAbility(e);
+      const kind = { ziel: 'Ziel', zufall: 'Zufall', aoe: 'AOE' }[a.targeting.kind];
+      return `${a.mode === 'zwang' ? 'Zwang' : 'Wahl'} · ${kind}`;
+    },
+  },
   {
     key: 'effekte', label: 'Effekte', singular: 'Effekt', newTitle: 'Neuer Effekt', icon: '🔥', creatable: true, section: 4,
     defaults: () => structuredClone(DEFAULT_EFFECT) as unknown as Record<string, unknown>,
@@ -125,8 +134,11 @@ export const TYPEN_AKTIONEN: CollectionDef = {
 export const TYPEN_CHARAKTERE: CollectionDef = {
   key: 'typen-charaktere', label: 'Typen für Allys & Gegner', singular: 'Typ', newTitle: 'Neuer Typ', icon: '🏷️', section: 4,
 };
+export const TYPEN_OBJEKTE: CollectionDef = {
+  key: 'typen-objekte', label: 'Typen für Objekte', singular: 'Typ', newTitle: 'Neuer Typ', icon: '🏷️', section: 5,
+};
 
-export const ALL_DEFS: CollectionDef[] = [...BAUSTEINE, SPIELE, SPIELSTAENDE, TYPEN_AKTIONEN, TYPEN_CHARAKTERE];
+export const ALL_DEFS: CollectionDef[] = [...BAUSTEINE, SPIELE, SPIELSTAENDE, TYPEN_AKTIONEN, TYPEN_CHARAKTERE, TYPEN_OBJEKTE];
 
 export function getDef(key: string): CollectionDef | undefined {
   return ALL_DEFS.find((d) => d.key === key);

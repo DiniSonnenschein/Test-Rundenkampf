@@ -13,17 +13,20 @@ import { ShapeIcon } from '../../ui/shapes';
 import type { EditorProps } from './index';
 import { DurationPicker, Select, SubCard } from './shared';
 
-const ALL: Selection = { all: true, ids: [], typeIds: [] };
+export const ALL: Selection = { all: true, ids: [], typeIds: [] };
 const TA = 'typen-aktionen';
 const TC = 'typen-charaktere';
+const TO = 'typen-objekte';
+/** Typen-Liste je Art (Gelände hat keine Typen). */
+export const TYPE_LIST: Record<EntityKind | 'gelaende', string | undefined> = { ally: TC, gegner: TC, objekt: TO, gelaende: undefined };
 
-const ENTITY_COLLECTION: Record<EntityKind | 'gelaende', string> = { ally: 'allys', gegner: 'gegner', objekt: 'objekte', gelaende: 'gelaende' };
-const ENTITY_OPTIONS: { value: EntityKind; label: string }[] = [
+export const ENTITY_COLLECTION: Record<EntityKind | 'gelaende', string> = { ally: 'allys', gegner: 'gegner', objekt: 'objekte', gelaende: 'gelaende' };
+export const ENTITY_OPTIONS: { value: EntityKind; label: string }[] = [
   { value: 'gegner', label: 'Gegner' },
   { value: 'ally', label: 'Ally' },
   { value: 'objekt', label: 'Objekt' },
 ];
-const TIMING_OPTIONS: { value: ChangeTiming; label: string }[] = [
+export const TIMING_OPTIONS: { value: ChangeTiming; label: string }[] = [
   { value: 'beginn', label: 'Zu Beginn' },
   { value: 'ende', label: 'Am Ende' },
 ];
@@ -43,6 +46,7 @@ const BLOCKS: { kind: EffectBlock['kind']; label: string; create: () => EffectBl
   { kind: 'hindernis-ignorieren', label: 'Hindernisse ignorieren', create: () => ({ kind: 'hindernis-ignorieren', category: 'objekt', selection: { ...ALL } }) },
   { kind: 'unveraenderlich', label: 'Ressource unveränderlich', create: () => ({ kind: 'unveraenderlich', resourceId: null, by: 'alle', typeIds: [] }) },
   { kind: 'unsichtbar', label: 'Nicht wahrnehmbar', create: () => ({ kind: 'unsichtbar', selection: { ...ALL } }) },
+  { kind: 'keine-kollision', label: 'Keine Kollision', create: () => ({ kind: 'keine-kollision' }) },
 ];
 
 function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: EffectBlock) => void; selfId: string }) {
@@ -159,7 +163,7 @@ function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: E
           <SelectionPicker
             value={b.selection}
             collection={ENTITY_COLLECTION[b.category]}
-            typeList={b.category === 'ally' || b.category === 'gegner' ? TC : undefined}
+            typeList={TYPE_LIST[b.category]}
             allLabel="Alle"
             onChange={(selection) => set({ ...b, selection })}
           />
@@ -184,6 +188,12 @@ function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: E
           {b.by === 'typen' && <TypePicker list={TA} value={b.typeIds} onChange={(typeIds) => set({ ...b, typeIds })} />}
         </>
       );
+    case 'keine-kollision':
+      return (
+        <p className="muted small">
+          Der Charakter kann sich ein Feld mit anderen teilen und gilt nicht als Hindernis. Anvisiert werden kann er trotzdem.
+        </p>
+      );
     case 'unsichtbar':
       return (
         <>
@@ -199,7 +209,7 @@ function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: E
 
 // ---------- Auslöser & Beendigung ----------
 
-const CONDITIONS: { kind: EffectCondition['kind']; label: string; create: () => EffectCondition }[] = [
+export const CONDITIONS: { kind: EffectCondition['kind']; label: string; create: () => EffectCondition }[] = [
   { kind: 'spielstart', label: 'Startet mit dem Effekt ins Spiel', create: () => ({ kind: 'spielstart' }) },
   { kind: 'level-enthaelt', label: 'Level enthält bestimmtes Objekt/Gegner/Ally', create: () => ({ kind: 'level-enthaelt', entity: 'gegner', id: null }) },
   { kind: 'bereich', label: 'Etwas betritt/verlässt einen Bereich', create: () => ({ kind: 'bereich', event: 'betritt', entity: 'gegner', selection: { ...ALL }, area: [] }) },
@@ -209,7 +219,7 @@ const CONDITIONS: { kind: EffectCondition['kind']; label: string; create: () => 
   { kind: 'gegenstand', label: 'Gegenstand sammeln/verwenden/platzieren', create: () => ({ kind: 'gegenstand', action: 'sammelt', objectId: null }) },
 ];
 
-function ConditionFields({ cond: c, set }: { cond: EffectCondition; set: (c: EffectCondition) => void }) {
+export function ConditionFields({ cond: c, set }: { cond: EffectCondition; set: (c: EffectCondition) => void }) {
   switch (c.kind) {
     case 'spielstart':
       return null;
@@ -228,7 +238,7 @@ function ConditionFields({ cond: c, set }: { cond: EffectCondition; set: (c: Eff
           <SelectionPicker
             value={c.selection}
             collection={ENTITY_COLLECTION[c.entity]}
-            typeList={c.entity === 'objekt' ? undefined : TC}
+            typeList={TYPE_LIST[c.entity]}
             allLabel="Beliebige"
             onChange={(selection) => set({ ...c, selection })}
           />
@@ -327,7 +337,7 @@ function labelOf<T extends { kind: string; label: string }>(list: T[], kind: str
 }
 
 /** Liste mit „+“-Knopf, der ein Menü der möglichen Arten öffnet. */
-function KindList<T extends { kind: string }>({
+export function KindList<T extends { kind: string }>({
   title, hint, items, kinds, addLabel, onChange, render,
 }: {
   title: string;

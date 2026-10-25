@@ -77,7 +77,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 2 | Kampfregeln – der Kern | ✅ |
 | 3 | Ressourcen & Attribute | ✅ |
 | 4 | Effekte | ✅ |
-| 5 | Fähigkeiten | ⬜ |
+| 5 | Fähigkeiten | ✅ |
 | 6 | Allys | ⬜ |
 | 7 | Gegner & Gegner-KI | ⬜ |
 | 8 | Objekte / Gegenstände | ⬜ |
@@ -272,6 +272,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Gelände-Effekte ignorieren | durch Betreten/Verlassen aller oder bestimmter Geländearten |
 | Hindernisse ignorieren | Objekte / Allys / Gegner / Gelände – alle oder bestimmte (Einträge und/oder Typen) |
 | Ressource unveränderlich | eine globale oder eigene Ressource kann nicht verändert werden durch: alle / gegnerische / Ally- / eigene Fähigkeiten & Effekte / bestimmte Typen |
+| Keine Kollision | kann Felder mit anderen teilen und gilt nicht als Hindernis; bleibt anvisierbar |
 | Nicht wahrnehmbar | für alle oder bestimmte Charaktere: nicht anvisierbar (AOE trifft trotzdem), Gegner behandeln ihn als nicht existent; Darstellung: Gegner unsichtbar, Allys transparent |
 
 **Auslöser** (wann ein Charakter den Effekt erhält; beliebig viele):
@@ -290,6 +291,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 **Typen-Listen** (Einstellungen → Typen; dort hinzufügen, umbenennen, löschen – oder direkt beim Zuweisen anlegen):
 - **Typen für Fähigkeiten & Effekte** (gemeinsame Liste)
 - **Typen für Allys & Gegner**
+- **Typen für Objekte**
 
 **Umsetzung:**
 - `src/engine/effects.ts` – Datenmodell und Laufzeit-Regeln (Stapeln, Unverträglichkeit, Dauer/Beendigung, dauerhafte Veränderungen) mit Tests
@@ -300,19 +302,53 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - Die Bausteine wirken im Kampf, sobald die Kampf-Oberfläche (Abschnitt 13) sie verbindet.
 
 ### 5 – Fähigkeiten
-**Ziel:** Aktionen, die Allys und Gegner im Kampf nutzen.
-- **Jede Aktion ist eine Fähigkeit** – auch Bewegung, Angriff, Licht („Licht ins Dunkel“). Bewegung ist keine feste Fähigkeit; sie wird z. B. über einen Typ „Bewegung“ und eine Ressource „Schritte“ abgebildet.
-- **Typen** aus der gemeinsamen Liste „Fähigkeiten & Effekte“
-- Ob eine Fähigkeit Effekte auslöst oder beendet (inkl. Dauer), wird in der Fähigkeit festgelegt
-- Reichweite / Wirkungsbereich über die **Bereichs-Auswahl**
-- **Aktionsplätze** pro Charakter: jeder Platz bietet eine Auswahl an Fähigkeiten (Abschnitt 2)
-- Angriffe verändern Ressourcen des Ziels (z. B. LP −3); Schutz davor über Effekte
-- Ob eine Fähigkeit durch Hindernisse blockiert wird (Sichtlinie), ist pro Fähigkeit einstellbar
-- Kosten (Ressourcen), Abklingzeit, Reichweite, Zielart (Einzelziel, Fläche, selbst, Verbündete)
-- Kombination mehrerer Effekte
-- Passive Fähigkeiten?
+**Ziel:** Aktionen, die Allys und Gegner nutzen. **Jede Aktion ist eine Fähigkeit** (auch Bewegung, Angriff, Licht). Fähigkeiten werden einmalig ausgeführt. Welche Fähigkeiten ein Charakter in welchem Aktionsplatz hat (und ob eine Fähigkeit mehrfach pro Zug nutzbar ist), wird bei den Charakteren festgelegt.
 
-**Offene Punkte / Entscheidungen:** –
+**Grundeinstellungen:**
+- **Typen** (Liste „Fähigkeiten & Effekte“)
+- **Darstellung** (mehrere möglich): Objekt fliegt zum Ziel (Form & Farbe) · Anwender leuchtet kurz (Farbe) · Ziele leuchten kurz (Farbe)
+- **Zwang- oder Wahl-Fähigkeit:** Zwang-Fähigkeiten *müssen* eingesetzt werden, sobald sie einsetzbar sind (nur die Ziele dürfen noch gewählt werden); Wahl-Fähigkeiten werden als Möglichkeit angezeigt und können abgelehnt werden.
+- **Auslöser** (optional): dieselben wie bei Effekten, zusätzlich: ein Ally/Gegner in der Nähe (Bereich) **wird Ziel** einer Fähigkeit (bestimmter Typen) bzw. **verwendet** eine Fähigkeit (bestimmter Typen). Ausgelöste Fähigkeiten laufen als **Reaktion** (kein Aktionsplatz im regulären Zug); Ziele wählt weiterhin der Spieler.
+
+**Zielwahl:**
+- **Ziel** (selbst wählen) · **Zufall** (zufällig unter den legalen – einstellbar auch illegalen – Zielen in Reichweite; einzige Ausnahme vom Grundsatz „kein Zufall“; nach „Rückgängig“ wird neu gewürfelt) · **AOE** (alle legalen Felder in Reichweite)
+- Minimale/maximale Zielanzahl (nicht bei AOE). **Jedes Ziel kann nur einmal gewählt werden.**
+- **Legale Ziele:** Allys (Typen / mit Effekt), Gegner (Typen / mit Effekt), Objekte (bestimmte / Typen), Geländearten (bestimmte), leere Felder, Charaktere, die gerade eine Fähigkeit (bestimmter Typen) ausführen bzw. gerade Ziel einer Fähigkeit (bestimmter Typen) werden
+- Anvisiert werden können nur **sichtbare** Ziele; AOE trifft alle. Eine Sichtlinie zum Zielen ist nicht nötig.
+- **Reichweite** (Bereichs-Auswahl vom Anwender, dreht mit seiner Blickrichtung; Mittelfeld markiert = sich selbst wählbar). Felder hinter Hindernissen sind **immer wählbar**.
+- **Trifft auch hinter Hindernissen** ja/nein. Wenn nein und ein Hindernis im Weg ist: bricht ganz ab · bricht nur für dieses Ziel ab · Hindernis-Feld wird Ziel · Feld davor wird Ziel · trifft Hindernis(-Feld davor) und Ziel · **prallt ab** (Einfallswinkel = Ausfallswinkel, das Feld ist der Spiegel; max. Anzahl Abpraller einstellbar; beim letzten Hindernis gilt eine der anderen Optionen; verlässt sie das Spielfeld, verschwindet sie)
+- **Radius** (Bereichs-Auswahl um jedes Ziel, immer mit Blick nach oben): legale Ziele darin werden getroffen, gelten aber nicht als Ziele (wie AOE); Radius ignoriert Hindernisse ja/nein
+
+**Bedingungen** (alle müssen erfüllt sein; Bereiche vom Anwender aus): trägt bestimmten Gegenstand · Ressource mindestens/höchstens X · Ally/Gegner/Objekt/Geländeart (ggf. Typ) im Bereich
+
+**Kosten:** Werte globaler/individueller Ressourcen und/oder Verbrauch von Objekten (bestimmte/Typen). Nicht bezahlbar → nicht einsetzbar.
+**Kostensteigerung:** pro zusätzlichem Ziel bzw. pro Feld Entfernung (Schritte, diagonal = 1) um X einer Ressource. Zusätzliche Ziele/weitere Entfernung nur wählbar, wenn bezahlbar.
+
+**Bausteine** (beliebig viele; jeder kann **Zusatzkosten** haben, die zu den Grundkosten addiert werden; Beträge sind immer feste Zahlen):
+| Baustein | Inhalt |
+|---|---|
+| Ressource der Ziele verändern | ±Wert, darf Maximum überschreiten ja/nein |
+| Effekt auslösen/beenden | bestimmter Effekt (mit Dauer) bzw. beenden: bestimmter Effekt oder Typen; passt nichts, passiert nichts |
+| Fähigkeit auslösen/unterbrechen | bestimmte Fähigkeit oder Typen des Ziels |
+| Einmaliger Schutz | vor der nächsten eingehenden Fähigkeit / Effekt / Ressourcen-Änderung; von beliebiger Quelle / Gegnern / Allys / Typen; Dauer frei wählbar |
+| Ziel bewegen | in Richtung (mögliche Zielfelder per Bereich, oben = Norden) / vom Anwender weg / zum Anwender hin um X Felder; Hindernisse stoppen (außer ignoriert) |
+| Anwender bewegen | zum gewählten Ort (mögliche Felder per Bereich, oben = Norden); ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung |
+| Feld in Geländeart umwandeln | bis zum Ende des Levels |
+| Sammeln | nur Objekte, in den Rucksack des Anwenders |
+| Tragen | alles ist tragbar, beliebig viel; Getragenes bleibt auf dem Feld des Anwenders |
+| Platzieren | Getragenes oder Objekte aus dem Rucksack; Zielort per Bereich; Hindernisse ignorieren ja/nein |
+| Blickrichtung ändern | Ziel oder Anwender dreht sich: zum anderen hin / von ihm weg / feste Richtung |
+
+Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender und Ziel.
+
+**Hindernisse:** Ob ein Charakter oder Objekt ein Hindernis ist (also eine „Kollision“ hat), wird in seinem Editor eingestellt. Ohne Kollision können sich Figuren ein Feld teilen (Effekt-Baustein „Keine Kollision“).
+
+**Sicht der Gegner:** Gegner sehen im Nebel nur ihr eigenes Sichtfeld; stehen sie im Licht, sehen sie zusätzlich alles im Licht (Ausnahme: „Nicht wahrnehmbar“).
+
+**Umsetzung:**
+- `src/engine/abilities.ts` – Datenmodell, Kostenberechnung und Flugbahn mit Abprallen (mit Tests)
+- `src/screens/editors/AbilityEditor.tsx`
+- Objekt-Typen als dritte Typen-Liste in den Einstellungen
 
 ### 6 – Allys
 **Ziel:** Spielbare Charaktere anlegen.
@@ -324,6 +360,9 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - **Typen** aus der Liste „Allys & Gegner“
 - **Reaktionen** (kleine Zwischen-Züge, die nicht als Züge gelten und durch ein Ereignis einmalig ausgelöst werden)
 - Ausnahmen: Effekte, von denen der Charakter nicht betroffen sein kann
+- **Kollision** (ist Hindernis, belegt sein Feld) ja/nein
+- Rucksack (gesammelte Objekte)
+- Darf eine Fähigkeit mehrfach pro Zug genutzt werden (z. B. Bewegung in Etappen)?
 - Zusätzliche Züge pro Runde / Reaktionen
 - Ausrüstung/Inventar-Plätze?
 - Klassen, Stufen/Levelaufstieg?
@@ -336,7 +375,8 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - Werte und Fähigkeiten (wie Allys)
 - Verhalten/KI: einfache Regeln (z. B. „greift schwächstes Ziel an“, „heilt bei < 30 % LP“) – frei konfigurierbar?
 - Was passiert bei 0 LP o. Ä. (bewusstlos, flieht, verschwindet …)
-- **Sicht im Nebel** per Bereichs-Auswahl, **Typen**, Reaktionen, Effekt-Ausnahmen (wie Allys)
+- **Sicht im Nebel** per Bereichs-Auswahl, **Typen**, Reaktionen, Effekt-Ausnahmen, Kollision (wie Allys)
+- Gegner sehen im Nebel nur ihr Sichtfeld, im Licht zusätzlich alles Beleuchtete
 - **Hauptziel**: Wie wählt ein Gegner (bzw. ein unkontrollierbarer Ally) sein Hauptziel?
 - Beute/Belohnungen beim Besiegen
 
@@ -347,7 +387,9 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
 - Typen: Verbrauchsgegenstände, Ausrüstung, Schlüssel/Quest-Objekte, Fallen, interaktive Map-Objekte (Truhen, Hebel)?
 - Wirkung über Effekte
-- **Wirft Schatten** (blockiert Licht/Sicht) und blockiert ggf. Fernangriffe – pro Objekt einstellbar
+- **Wirft Schatten** (blockiert Licht/Sicht) – pro Objekt einstellbar
+- **Kollision** (ist Hindernis für Bewegung und Fähigkeiten) ja/nein
+- **Typen** (Liste „Objekte“)
 - Stapelbarkeit, Inventar (Team oder pro Charakter)
 
 **Offene Punkte / Entscheidungen:** –
