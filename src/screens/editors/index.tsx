@@ -2,6 +2,7 @@
 import type { ComponentType } from 'react';
 import type { Entry } from '../../data/model';
 import { AbilityEditor } from './AbilityEditor';
+import { BehaviorEditor } from './BehaviorEditor';
 import { CharacterEditor } from './CharacterEditor';
 import { EffectEditor } from './EffectEditor';
 import { GameEditor } from './GameEditor';
@@ -19,5 +20,11 @@ export const EDITORS: Record<string, ComponentType<EditorProps>> = {
   effekte: EffectEditor,
   faehigkeiten: AbilityEditor,
   allys: CharacterEditor,
+  gegner: (props) => (
+    <>
+      <CharacterEditor {...props} />
+      <BehaviorEditor {...props} />
+    </>
+  ),
   spiele: GameEditor,
 };

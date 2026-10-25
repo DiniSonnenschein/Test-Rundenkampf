@@ -8,7 +8,7 @@ import { ColorWheel } from '../ui/ColorWheel';
 import { useDialog } from '../ui/Dialog';
 import { formatDate } from '../ui/format';
 import { Header } from '../ui/Header';
-import { SHAPES, ShapeIcon } from '../ui/shapes';
+import { ShapeIcon, ShapePicker } from '../ui/shapes';
 import { EDITORS } from './editors';
 import { useEntryActions } from './useEntryActions';
 import { Stepper } from '../ui/fields';
@@ -111,19 +111,7 @@ function LookFields({ entry, set }: { entry: Entry; set: (patch: Partial<Entry>)
       </div>
 
       <span className="field-label">Form</span>
-      <div className="shape-grid">
-        {SHAPES.map((s) => (
-          <button
-            key={s.key}
-            className={`shape-option ${s.key === shape ? 'selected' : ''}`}
-            onClick={() => set({ shape: s.key })}
-            aria-label={s.label}
-          >
-            <ShapeIcon shape={s.key} color={color} size={36} />
-            <span>{s.label}</span>
-          </button>
-        ))}
-      </div>
+      <ShapePicker value={shape} color={color} onChange={(key) => set({ shape: key })} />
 
       <span className="field-label">Farbe</span>
       <ColorWheel value={color} onChange={(c) => set({ color: c })} />

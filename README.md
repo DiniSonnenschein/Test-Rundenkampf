@@ -79,7 +79,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 4 | Effekte | ✅ |
 | 5 | Fähigkeiten | ✅ |
 | 6 | Allys | ✅ |
-| 7 | Gegner & Gegner-KI | ⬜ |
+| 7 | Gegner & Gegner-KI | ✅ |
 | 8 | Objekte / Gegenstände | ⬜ |
 | 9 | Geländearten | ⬜ |
 | 10 | Level-Editor | ⬜ |
@@ -268,7 +268,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Reaktion hinzufügen | wie im Charakter-Editor (Abschnitt 6) |
 | Möglichkeit verlieren | einen Zug zu tätigen (setzt aus) / eine Reaktion / grundsätzlich Fähigkeiten / Fähigkeiten bestimmter Typen |
 | Sicht im Nebel ersetzen | per Bereichs-Auswahl; Schatten verdecken weiterhin |
-| Verhalten ändern | Gegner: neues Hauptziel; Allys: unkontrollierbar mit Hauptziel (Details Abschnitt 7) |
+| Verhalten ändern | eigene Hauptziel-Prioritätenliste (unter Allys / Gegnern / allen) und Bewegungsart (zum Ziel / Abstand halten / fliehen / im Kreis / stehen). Ersetzt bei Gegnern Regeln und Reaktionen, Allys werden unkontrollierbar. Fallende Ressourcen ändern daran nichts. **Flucht** wird so umgesetzt |
 | Gelände-Effekte ignorieren | durch Betreten/Verlassen aller oder bestimmter Geländearten |
 | Hindernisse ignorieren | Objekte / Allys / Gegner / Gelände – alle oder bestimmte (Einträge und/oder Typen) |
 | Ressource unveränderlich | eine globale oder eigene Ressource kann nicht verändert werden durch: alle / gegnerische / Ally- / eigene Fähigkeiten & Effekte / bestimmte Typen |
@@ -390,17 +390,28 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 - `src/screens/editors/CharacterEditor.tsx`
 
 ### 7 – Gegner & Gegner-KI
-**Ziel:** Nicht-spielbare Charaktere inkl. Verhalten anlegen.
-- Titel, Notiz, Form, Farbe, Größe bereits vorhanden (Abschnitt 1)
-- Gleicher Charakter-Editor wie Allys (Werte, Aktionen, Reaktionen, Start-Effekte, Ausnahmen, Sicht, Kollision, Rucksack)
-- Verhalten/KI: einfache Regeln (z. B. „greift schwächstes Ziel an“, „heilt bei < 30 % LP“) – frei konfigurierbar?
-- Was passiert bei 0 LP o. Ä. (bewusstlos, flieht, verschwindet …)
-- **Sicht im Nebel** per Bereichs-Auswahl, **Typen**, Reaktionen, Effekt-Ausnahmen, Kollision (wie Allys)
-- Gegner sehen im Nebel nur ihr Sichtfeld, im Licht zusätzlich alles Beleuchtete
-- **Hauptziel**: Wie wählt ein Gegner (bzw. ein unkontrollierbarer Ally) sein Hauptziel?
-- Beute/Belohnungen beim Besiegen
+**Ziel:** Nicht-spielbare Charaktere mit fester, nachvollziehbarer KI (kein Zufall: gleiche Lage → gleiches Handeln).
 
-**Offene Punkte / Entscheidungen:** –
+**Gegner-Editor** = Charakter-Editor wie bei Allys (Abschnitt 6) plus **Verhalten**:
+- **Hauptziel:** Prioritätenliste (mit „+“, umsortierbar). Das erste Kriterium entscheidet, die weiteren brechen Gleichstände; bei völligem Gleichstand gilt eine feste Reihenfolge. Kriterien: nächster (Schritte) · niedrigster/höchster Wert einer Ressource · Laternenträger · wer zuletzt angegriffen hat · bestimmter Typ · bestimmter Effekt. **Gibt es zum Ziel keinen Weg, geht es in der Liste weiter.**
+- **Zielwechsel** (pro Gegner): jeden Zug neu oder bis das Ziel ungültig ist (nicht sichtbar, bewusstlos, verwandelt …).
+- **Ohne sichtbares Ziel** (pro Gegner): stehen bleiben · Patrouille laufen (Weg im Level-Editor) · zur letzten bekannten Position · zum Licht.
+- **Bewegung:** kürzester Weg; optional „Abstand halten: X Felder“.
+- **Regel-Liste** (mit „+“): „Wenn [Bedingungen] → [Fähigkeit] auf [Hauptziel / sich selbst / Verbündeten (eigene kleine Prioritätenliste)]“, jeweils gültig im Zug und/oder als Reaktion. Von oben nach unten: die erste passende Regel wird ausgeführt, dann geht es von vorn los, bis nichts mehr möglich ist. Bedingungen: Ziel in Reichweite der Fähigkeit · hat Effekt (selbst/Hauptziel) · Gegenstand · Ressource min./max. · etwas im Bereich.
+- **Reaktionen** setzt ein Gegner nur über Regeln mit „Als Reaktion“ ein.
+- **Eigene Events** pro Ressource (wie Ressourcen-Events, nur für diesen Gegner): wird zerstört · erhält Effekt (z. B. Flucht) · wird ersetzt durch Ally/Gegner/Objekt · Run gewonnen/verloren.
+- **Beute:** Gegenstände, die auf seinem Feld landen – bei Zerstörung, bei Flucht oder beides.
+- **Flucht** läuft über einen Effekt mit dem Baustein „Verhalten ändern“ (Bewegung „Fliehen“). Solange ein Verhaltens-Effekt aktiv ist, ersetzt er Regeln und Reaktionen – ein fliehender Gegner greift also nicht mehr an.
+- **Unkontrollierbare Allys** (gleicher Effekt-Baustein): nur dessen Prioritätenliste und Bewegungsart gelten; auch Allys können Hauptziel sein.
+- Keine extra Markierung für Gegner.
+
+**Formen-Bibliothek** (für Allys, Gegner, Objekte und fliegende Fähigkeiten; ohne Beschriftung, nach Kategorien): Grundformen (8) · Fantasy (Goblin-, Ork-, Elf-, Vampir-Kopf, Naga, Krone, Diadem, Geist, Spirit, Engel) · Tiere (Bär, Drache, Salamander, Schlange, Wolf, Ratte, Fuchs, Eichhörnchen, Hirsch, Schwein, Wildschwein, Hase, Eule) · Pflanzen (Apfel, Karotte, Kürbis, Pilz, Gras, Kraut, Blume, Beere, Wurzel, Rübe, Eichel, Haselnuss) · Ausrüstung (Schwert, Säbel, Schild, Kochtopf, Speer, Bogen, Armbrust, Zauberstab, Buch, Schriftrolle, Geige, Rüstung, Trommel, Kompass, Besen, Laterne, Zauberhut) · Sonstiges (Baum, Stein, Truhe, Sack, Baumstamm, Gebüsch, Tanne, Feuer, Brunnen, Mauer, Blatthaufen, Schnee, Blitz, Wolke)
+
+**Umsetzung:**
+- `src/engine/behavior.ts` – Datenmodell und Auswertung (Ziel-Rangfolge, Weiter in der Liste ohne Weg, erste passende Regel) mit Tests
+- `src/screens/editors/BehaviorEditor.tsx` – Verhalten im Gegner-Editor; Prioritätenliste auch im Effekt-Baustein „Verhalten ändern“
+- `src/ui/shapes.tsx` – Formen-Bibliothek mit Kategorien
+- Ausgeführt wird die KI im Spielmodus (Abschnitt 13).
 
 ### 8 – Objekte / Gegenstände
 **Ziel:** Sammelbare und nutzbare Gegenstände.

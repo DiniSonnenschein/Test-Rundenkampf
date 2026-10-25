@@ -12,6 +12,8 @@ import { MultiRefPicker, SelectionPicker, TypePicker } from '../../ui/pickers';
 import { ShapeIcon } from '../../ui/shapes';
 import type { EditorProps } from './index';
 import { DurationPicker, Select, SubCard } from './shared';
+import { PriorityList } from './BehaviorEditor';
+import type { MovementMode } from '../../engine/behavior';
 
 export const ALL: Selection = { all: true, ids: [], typeIds: [] };
 const TA = 'typen-aktionen';
@@ -41,7 +43,10 @@ const BLOCKS: { kind: EffectBlock['kind']; label: string; create: () => EffectBl
   { kind: 'reaktion', label: 'Reaktion hinzufügen', create: () => ({ kind: 'reaktion' }) },
   { kind: 'verlust', label: 'Möglichkeit verlieren', create: () => ({ kind: 'verlust', what: 'zug', typeIds: [] }) },
   { kind: 'sicht', label: 'Sicht im Nebel ersetzen', create: () => ({ kind: 'sicht', area: ['0,0'] }) },
-  { kind: 'verhalten', label: 'Verhalten ändern', create: () => ({ kind: 'verhalten' }) },
+  {
+    kind: 'verhalten', label: 'Verhalten ändern',
+    create: () => ({ kind: 'verhalten', targetSide: 'allys', criteria: [{ kind: 'naechster' }], movement: 'zum-ziel', distance: 3 }),
+  },
   { kind: 'gelaende-ignorieren', label: 'Gelände-Effekte ignorieren', create: () => ({ kind: 'gelaende-ignorieren', terrain: { ...ALL } }) },
   { kind: 'hindernis-ignorieren', label: 'Hindernisse ignorieren', create: () => ({ kind: 'hindernis-ignorieren', category: 'objekt', selection: { ...ALL } }) },
   { kind: 'unveraenderlich', label: 'Ressource unveränderlich', create: () => ({ kind: 'unveraenderlich', resourceId: null, by: 'alle', typeIds: [] }) },
@@ -136,10 +141,32 @@ function BlockFields({ block: b, set, selfId }: { block: EffectBlock; set: (b: E
       );
     case 'verhalten':
       return (
-        <p className="muted small">
-          Gegner erhalten ein neues Hauptziel; Allys werden unkontrollierbar und erhalten ein Hauptziel (wie ein Gegner). Die Wahl des
-          Hauptziels folgt mit dem Gegner-Verhalten (Abschnitt 7).
-        </p>
+        <>
+          <p className="muted small">
+            Gegner erhalten dieses Verhalten statt ihrer Regeln und Reaktionen; Allys werden unkontrollierbar. Fallende Ressourcen ändern daran
+            nichts.
+          </p>
+          <span className="field-label">Hauptziel unter</span>
+          <Choice<typeof b.targetSide>
+            value={b.targetSide}
+            options={[{ value: 'allys', label: 'Allys' }, { value: 'gegner', label: 'Gegnern' }, { value: 'alle', label: 'Allen' }]}
+            onChange={(targetSide) => set({ ...b, targetSide })}
+          />
+          <PriorityList value={b.criteria} onChange={(criteria) => set({ ...b, criteria })} />
+          <span className="field-label">Bewegung</span>
+          <Select<MovementMode>
+            value={b.movement}
+            options={[
+              { value: 'zum-ziel', label: 'Zum Ziel' },
+              { value: 'abstand', label: 'Abstand halten' },
+              { value: 'fliehen', label: 'Fliehen (vom Ziel weg)' },
+              { value: 'kreis', label: 'Im Kreis laufen' },
+              { value: 'stehen', label: 'Stehen bleiben' },
+            ]}
+            onChange={(movement) => set({ ...b, movement })}
+          />
+          {b.movement === 'abstand' && <Stepper value={b.distance} min={1} onChange={(distance) => set({ ...b, distance })} />}
+        </>
       );
     case 'gelaende-ignorieren':
       return (
@@ -350,7 +377,7 @@ function labelOf<T extends { kind: string; label: string }>(list: T[], kind: str
 
 /** Liste mit „+“-Knopf, der ein Menü der möglichen Arten öffnet. */
 export function KindList<T extends { kind: string }>({
-  title, hint, items, kinds, addLabel, onChange, render,
+  title, hint, items, kinds, addLabel, onChange, render, numbered = false,
 }: {
   title: string;
   hint?: string;
@@ -359,9 +386,12 @@ export function KindList<T extends { kind: string }>({
   addLabel: string;
   onChange: (items: T[]) => void;
   render: (item: T, set: (item: T) => void) => React.ReactNode;
+  /** Einträge durchnummerieren (statt nach Art zu benennen). */
+  numbered?: boolean;
 }) {
   const dialog = useDialog();
   async function add() {
+    if (kinds.length === 1) return onChange([...items, kinds[0].create()]);
     const kind = await dialog.menu({ title: addLabel, items: kinds.map((k) => ({ label: k.label, value: k.kind })) });
     const def = kinds.find((k) => k.kind === kind);
     if (def) onChange([...items, def.create()]);
@@ -371,7 +401,7 @@ export function KindList<T extends { kind: string }>({
       <h2>{title}</h2>
       {hint && <p className="muted small">{hint}</p>}
       {items.map((item, i) => (
-        <SubCard key={i} title={labelOf(kinds, item.kind)} onRemove={() => onChange(items.filter((_, j) => j !== i))}>
+        <SubCard key={i} title={numbered ? `${addLabel} ${i + 1}` : labelOf(kinds, item.kind)} onRemove={() => onChange(items.filter((_, j) => j !== i))}>
           {render(item, (next) => onChange(items.map((x, j) => (j === i ? next : x))))}
         </SubCard>
       ))}

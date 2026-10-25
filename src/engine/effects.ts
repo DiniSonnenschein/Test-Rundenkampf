@@ -1,5 +1,6 @@
 // Effekte: dauerhafte Zustände auf Allys und Gegnern. Alle Charaktere können grundsätzlich
 // von allen Effekten betroffen sein (Ausnahmen legt die Charaktererstellung fest).
+import type { MovementMode, TargetCriterion } from './behavior';
 import type { Area } from './facing';
 import type { ChangeInterval, ChangeTiming, EffectDuration, EventDirection } from './resources';
 
@@ -45,8 +46,11 @@ export type EffectBlock =
   | { kind: 'verlust'; what: 'typ' | 'faehigkeiten' | 'zug' | 'reaktion'; typeIds: string[] }
   /** Ersetzt die Sicht im Nebel. */
   | { kind: 'sicht'; area: Area }
-  /** Gegner: neues Hauptziel; Allys: unkontrollierbar mit Hauptziel (Details Abschnitt 7). */
-  | { kind: 'verhalten' }
+  /**
+   * Gegner: neues Verhalten; Allys: unkontrollierbar. Ersetzt Regel-Liste und Reaktionen,
+   * solange der Effekt aktiv ist (z. B. Flucht).
+   */
+  | { kind: 'verhalten'; targetSide: 'allys' | 'gegner' | 'alle'; criteria: TargetCriterion[]; movement: MovementMode; distance: number }
   | { kind: 'gelaende-ignorieren'; terrain: Selection }
   | { kind: 'hindernis-ignorieren'; category: EntityKind | 'gelaende'; selection: Selection }
   | { kind: 'unveraenderlich'; resourceId: string | null; by: ChangeSource; typeIds: string[] }

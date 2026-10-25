@@ -9,7 +9,7 @@ import { AreaPicker } from '../../ui/AreaPicker';
 import { ColorWheel } from '../../ui/ColorWheel';
 import { Choice, RefSelect, Stepper, Toggle } from '../../ui/fields';
 import { MultiRefPicker, SelectionPicker, TypePicker } from '../../ui/pickers';
-import { SHAPES, ShapeIcon } from '../../ui/shapes';
+import { ShapePicker } from '../../ui/shapes';
 import {
   ALL, CONDITIONS, ConditionFields, ENTITY_COLLECTION, KindList, TYPE_LIST,
 } from './EffectEditor';
@@ -181,13 +181,13 @@ function TargetingCard({ t, set }: { t: Targeting; set: (t: Targeting) => void }
 
 // ---------- Bedingungen & Kosten ----------
 
-const CONDITION_KINDS: { kind: AbilityCondition['kind']; label: string; create: () => AbilityCondition }[] = [
+export const CONDITION_KINDS: { kind: AbilityCondition['kind']; label: string; create: () => AbilityCondition }[] = [
   { kind: 'gegenstand', label: 'Trägt bestimmten Gegenstand', create: () => ({ kind: 'gegenstand', objectId: null }) },
   { kind: 'ressource', label: 'Ressource mindestens/höchstens', create: () => ({ kind: 'ressource', resourceId: null, bound: 'min', value: 1 }) },
   { kind: 'in-bereich', label: 'Etwas befindet sich in einem Bereich', create: () => ({ kind: 'in-bereich', entity: 'gegner', selection: { ...ALL }, area: [] }) },
 ];
 
-function ConditionKindFields({ c, set }: { c: AbilityCondition; set: (c: AbilityCondition) => void }) {
+export function ConditionKindFields({ c, set }: { c: AbilityCondition; set: (c: AbilityCondition) => void }) {
   switch (c.kind) {
     case 'gegenstand':
       return <RefSelect collection="objekte" value={c.objectId} emptyLabel="– Gegenstand wählen –" onChange={(objectId) => set({ ...c, objectId })} />;
@@ -492,18 +492,11 @@ export function AbilityEditor({ entry, set }: EditorProps) {
         <Toggle label="Objekt fliegt zum Ziel" checked={d.projectile.on} onChange={(on) => update({ display: { ...d, projectile: { ...d.projectile, on } } })} />
         {d.projectile.on && (
           <>
-            <div className="shape-grid">
-              {SHAPES.map((s) => (
-                <button
-                  key={s.key}
-                  className={`shape-option ${s.key === d.projectile.shape ? 'selected' : ''}`}
-                  aria-label={s.label}
-                  onClick={() => update({ display: { ...d, projectile: { ...d.projectile, shape: s.key } } })}
-                >
-                  <ShapeIcon shape={s.key} color={d.projectile.color} size={28} />
-                </button>
-              ))}
-            </div>
+            <ShapePicker
+              value={d.projectile.shape}
+              color={d.projectile.color}
+              onChange={(shape) => update({ display: { ...d, projectile: { ...d.projectile, shape } } })}
+            />
             <ColorWheel value={d.projectile.color} onChange={(color) => update({ display: { ...d, projectile: { ...d.projectile, color } } })} />
           </>
         )}

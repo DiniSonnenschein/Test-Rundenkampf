@@ -347,3 +347,9 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .ability-row .stepper { flex: none; width: 150px; }
 .ability-row .stepper .btn { width: 40px; }
 .ability-row > select { flex: 1; min-width: 0; }
+
+/* ---------- Abschnitt 7: Formen nach Kategorien ---------- */
+.shape-picker { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 2px; }
+.shape-category { display: block; margin: 4px 0; font-size: .8rem; font-weight: 600; color: var(--text-muted); }
+.shape-picker .shape-grid { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.shape-picker .shape-option { padding: 6px 0; }
