@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   createBattle, currentUnit, endTurn, grantExtraTurn, moveUnit, placeUnit, placementArea,
-  placementSnapshot, removeUnit, setUnconscious, startBattle, useActionSlot, visible, type BattleMap, type BattleState,
+  onTargeted, placementSnapshot, removeUnit, setSkipsTurns, setUnconscious, startBattle, turnUnit, useActionSlot, visible,
+  type BattleMap, type BattleState,
 } from './battle';
+import { areaTiles, facingFromStep, facingTowards, rotateOffset } from './facing';
 import { recordTurn, undoTurns } from './history';
 import { distance, hasLineOfSight, neighbors, posKey, reachable, type Grid } from './grid';
 import { initiativeOrder } from './initiative';
@@ -44,6 +46,24 @@ describe('Raster', () => {
     const g = grid(5, 1, ['2,0']);
     expect(hasLineOfSight(g, { x: 0, y: 0 }, { x: 4, y: 0 })).toBe(false);
     expect(hasLineOfSight(g, { x: 0, y: 0 }, { x: 2, y: 0 })).toBe(true);
+  });
+});
+
+describe('Blickrichtung', () => {
+  it('dreht Bereiche mit', () => {
+    expect(rotateOffset(0, -1, 'o')).toEqual({ dx: 1, dy: 0 });
+    expect(rotateOffset(0, -1, 's')).toEqual({ dx: -0, dy: 1 });
+    expect(rotateOffset(0, -1, 'w')).toEqual({ dx: -1, dy: -0 });
+    expect(areaTiles({ x: 5, y: 5 }, ['1,-2'], 'o')).toEqual([{ x: 7, y: 6 }]);
+  });
+  it('folgt der Bewegung; diagonal bleibt die passende Richtung', () => {
+    expect(facingFromStep({ x: 0, y: 0 }, { x: 1, y: 0 }, 'n')).toBe('o');
+    expect(facingFromStep({ x: 0, y: 0 }, { x: 1, y: 1 }, 'o')).toBe('o');
+    expect(facingFromStep({ x: 0, y: 0 }, { x: 1, y: 1 }, 'n')).toBe('s');
+  });
+  it('dreht sich zum Ziel, genau diagonal bleibt alles', () => {
+    expect(facingTowards({ x: 0, y: 0 }, { x: 3, y: 1 }, 'n')).toBe('o');
+    expect(facingTowards({ x: 0, y: 0 }, { x: 2, y: 2 }, 'n')).toBe('n');
   });
 });
 
@@ -119,10 +139,34 @@ describe('Kampfablauf', () => {
     const s = setup();
     expect(visible(s).has('9,0')).toBe(false);
     expect(visible(s).has('2,4')).toBe(true);
-    const far = moveUnit(startBattle(s), 'ritter', { x: 9, y: 8 });
-    expect(visible(far).has('9,7')).toBe(false);
-    const seeing = { ...far, units: far.units.map((u) => (u.id === 'ritter' ? { ...u, sight: 1 } : u)) };
-    expect(visible(seeing).has('9,7')).toBe(true);
+    const far = moveUnit(startBattle(s), 'ritter', { x: 9, y: 8 }); // Schritt nach unten-rechts → Blick nach unten
+    expect(visible(far).has('9,9')).toBe(false);
+    // Sichtbereich: 1 Feld voraus (definiert mit Blick nach oben), dreht mit der Blickrichtung
+    const seeing = { ...far, units: far.units.map((u) => (u.id === 'ritter' ? { ...u, sightArea: ['0,-1'] } : u)) };
+    expect(visible(seeing).has('9,9')).toBe(true);
+    expect(visible(seeing).has('9,7')).toBe(false);
+  });
+
+  it('Blickrichtung: im eigenen Zug frei drehbar, Gegner drehen sich am Zugende zum Ziel', () => {
+    let s = startBattle(setup());
+    s = turnUnit(s, 'laterne', 'w');
+    expect(s.units[0].facing).toBe('w');
+    expect(() => turnUnit(s, 'ritter', 'o')).toThrow('eigenen Zug');
+    s = { ...s, units: s.units.map((u) => (u.id === 'goblin' ? { ...u, targetId: 'laterne' } : u)) };
+    s = endTurn(endTurn(s)); // Goblin am Zug
+    s = endTurn(s);
+    expect(s.units[2].facing).toBe('w'); // Goblin (9,0) → Laterne (2,2): vorwiegend links
+  });
+
+  it('Drehen zur Quelle, wenn Ziel einer Fähigkeit (laut Regelwerk)', () => {
+    const base = startBattle(setup());
+    expect(onTargeted(base, 'ritter', 'goblin').units[1].facing).toBeUndefined();
+    const hostile = startBattle(setup(normalizeRules({ facing: { turnWhenTargeted: 'gegnerisch' } })));
+    expect(onTargeted(hostile, 'ritter', 'goblin').units[1].facing).not.toBeUndefined();
+    expect(onTargeted(hostile, 'ritter', 'laterne').units[1].facing).toBeUndefined();
+    const typed = startBattle(setup(normalizeRules({ facing: { turnWhenTargeted: 'typen', typeIds: ['feuer'] } })));
+    expect(onTargeted(typed, 'ritter', 'laterne', ['eis']).units[1].facing).toBeUndefined();
+    expect(onTargeted(typed, 'ritter', 'laterne', ['feuer']).units[1].facing).not.toBeUndefined();
   });
 
   it('die Laterne brennt auch, wenn der Träger bewusstlos ist', () => {
@@ -178,26 +222,35 @@ describe('Kampfablauf', () => {
     expect(s.phase).toBe('sieg');
   });
 
-  it('Run verloren nach X verpassten Zügen in Bewusstlosigkeit (auch Laternenträger)', () => {
+  it('Run verloren nach X eigenen Zügen am Stück mit „Bewusstlos“ (auch Laternenträger)', () => {
     let s = startBattle(setup(rulesWith({ unconsciousTurns: 2 })));
-    s = setUnconscious(s, 'laterne', true); // war am Zug → Zug endet sofort
+    s = endTurn(endTurn(endTurn(s))); // Runde 2, Laterne am Zug
+    s = setSkipsTurns(setUnconscious(s, 'laterne', true), 'laterne', true); // Zug endet sofort
     expect(currentUnit(s)?.id).toBe('ritter');
-    s = endTurn(endTurn(s)); // Runde 2: Laterne verpasst 1. Zug
-    expect(s.units[0].missedTurns).toBe(1);
+    s = endTurn(endTurn(s)); // Runde 3: 1. Zug bewusstlos
+    expect(s.units[0].unconsciousTurns).toBe(1);
     expect(s.phase).toBe('kampf');
-    s = endTurn(endTurn(s)); // Runde 3: 2. verpasster Zug
+    s = endTurn(endTurn(s)); // Runde 4: 2. Zug
     expect(s.phase).toBe('niederlage');
     expect(s.outcome).toContain('Laterne');
   });
 
+  it('Bewusstlos ohne Aussetzen: Charakter ist am Zug, Züge zählen trotzdem', () => {
+    let s = setUnconscious(startBattle(setup(rulesWith({ unconsciousTurns: 3 }))), 'ritter', true);
+    s = endTurn(s);
+    expect(currentUnit(s)?.id).toBe('ritter');
+    expect(s.units[1].unconsciousTurns).toBe(1);
+  });
+
   it('Aufwecken setzt den Zähler zurück; 0 = aus', () => {
     let s = startBattle(setup(rulesWith({ unconsciousTurns: 2 })));
-    s = setUnconscious(s, 'laterne', true);
-    s = endTurn(endTurn(s));
-    s = setUnconscious(s, 'laterne', false);
-    expect(s.units[0].missedTurns).toBe(0);
+    s = setSkipsTurns(setUnconscious(s, 'ritter', true), 'ritter', true);
+    s = endTurn(s); // Ritter setzt aus (1. Zug)
+    expect(s.units[1].unconsciousTurns).toBe(1);
+    s = setUnconscious(s, 'ritter', false);
+    expect(s.units[1].unconsciousTurns).toBe(0);
 
-    let t = setUnconscious(startBattle(setup(rulesWith({ unconsciousTurns: 0 }))), 'ritter', true);
+    let t = setSkipsTurns(setUnconscious(startBattle(setup(rulesWith({ unconsciousTurns: 0 }))), 'ritter', true), 'ritter', true);
     for (let i = 0; i < 10; i++) t = endTurn(t);
     expect(t.phase).toBe('kampf');
   });

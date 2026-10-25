@@ -1,5 +1,6 @@
 // Ablauf eines Level-Kampfes: Platzierung → Runden mit Zügen nach Initiative → Sieg/Niederlage.
 // Der Zustand ist reines JSON (für Spielstände); alle Funktionen liefern einen neuen Zustand.
+import { areaTiles, facingFromStep, facingTowards, type Area, type Facing } from './facing';
 import { inBounds, posKey, samePos, type Grid, type Pos } from './grid';
 import { initiativeOrder } from './initiative';
 import { INITIATIVE_ID } from './resources';
@@ -7,7 +8,7 @@ import { litTiles, visibleTiles, type LightSource } from './light';
 import type { Rules } from './rules';
 
 export type Side = 'ally' | 'enemy';
-/** bewusstlos = fester Effekt (Abschnitt 4); entfernt = z. B. geflohener Gegner. Niemand stirbt. */
+/** bewusstlos = hat den festen Effekt „Bewusstlos“; entfernt = z. B. geflohener Gegner. Niemand stirbt. */
 export type UnitStatus = 'aktiv' | 'bewusstlos' | 'entfernt';
 export type Phase = 'platzierung' | 'kampf' | 'sieg' | 'niederlage';
 
@@ -19,10 +20,16 @@ export interface Unit {
   status: UnitStatus;
   /** Laternenträger: steht fest auf dem Laternen-Startfeld; die Laterne brennt auch, wenn er bewusstlos ist. */
   lantern?: { radius?: number };
-  /** Eigensicht ohne Licht (Radius, 0 = nur eigenes Feld). */
-  sight?: number;
-  /** Am Stück bewusstlos verpasste eigene Züge. */
-  missedTurns?: number;
+  /** Blickrichtung (Standard: oben). */
+  facing?: Facing;
+  /** Eigensicht im Nebel als Bereich relativ zur Blickrichtung (leer = nichts). */
+  sightArea?: Area;
+  /** Eigene Züge am Stück mit dem Effekt „Bewusstlos“. */
+  unconsciousTurns?: number;
+  /** Setzt Züge aus (z. B. durch den Effekt-Baustein „Möglichkeit verlieren: Zug“). */
+  skipsTurns?: boolean;
+  /** Hauptziel (Gegner bzw. unkontrollierbare Allys, Abschnitt 7). */
+  targetId?: string;
   /** Abweichende Anzahl Züge pro Runde. */
   turnsPerRound?: number;
   /** Aktionsplätze eines Zuges; jeder Platz bietet eine Auswahl an Fähigkeiten (IDs). */
@@ -91,11 +98,13 @@ function lightSources(s: BattleState): LightSource[] {
     .map((u) => ({ pos: u.pos!, radius: u.lantern!.radius ?? s.rules.light.lanternRadius }));
 }
 
-/** Aktuell sichtbare Felder: Licht + Eigensicht wacher Allys. */
+export const facingOf = (u: Unit): Facing => u.facing ?? 'n';
+
+/** Aktuell sichtbare Felder: Licht + was wache Allys sehen (alle Allys teilen ihre Sicht). */
 export function visible(s: BattleState): Set<string> {
   const viewers = s.units
     .filter((u) => u.side === 'ally' && u.status === 'aktiv' && u.pos)
-    .map((u) => ({ pos: u.pos!, radius: u.sight ?? 0 }));
+    .map((u) => ({ pos: u.pos!, tiles: areaTiles(u.pos!, u.sightArea ?? [], facingOf(u)) }));
   return visibleTiles(gridOf(s.map), lightSources(s), viewers, s.rules.light.shape);
 }
 
@@ -197,7 +206,10 @@ function roundQueue(s: BattleState): string[] {
   return queue;
 }
 
-/** Nächster Zug; Bewusstlose verpassen ihren Zug (wird gezählt). */
+/**
+ * Nächster Zug. Züge mit „Bewusstlos“ werden gezählt (Run verloren nach X am Stück);
+ * wer Züge aussetzt, wird übersprungen.
+ */
 function beginTurn(s: BattleState): BattleState {
   let queue = s.queue.filter((id) => getUnit(s, id)?.status !== 'entfernt');
   let round = s.round;
@@ -208,13 +220,15 @@ function beginTurn(s: BattleState): BattleState {
       if (queue.length === 0) break;
     }
     const unit = getUnit(s, queue[0])!;
-    if (unit.status === 'aktiv') break;
-    const missed = (unit.missedTurns ?? 0) + 1;
-    s = updateUnit(s, unit.id, { missedTurns: missed });
-    const limit = s.rules.defeat.unconsciousTurns;
-    if (unit.side === 'ally' && limit > 0 && missed >= limit) {
-      return { ...s, round, queue, phase: 'niederlage', turn: null, outcome: `${unit.name} war ${missed} Züge bewusstlos.` };
+    if (unit.status === 'bewusstlos') {
+      const count = (unit.unconsciousTurns ?? 0) + 1;
+      s = updateUnit(s, unit.id, { unconsciousTurns: count });
+      const limit = s.rules.defeat.unconsciousTurns;
+      if (unit.side === 'ally' && limit > 0 && count >= limit) {
+        return { ...s, round, queue, phase: 'niederlage', turn: null, outcome: `${unit.name} war ${count} Züge bewusstlos.` };
+      }
     }
+    if (!unit.skipsTurns) break;
     queue = queue.slice(1);
   }
   return { ...s, round, queue, turn: queue.length ? { unitId: queue[0], usedSlots: [] } : null };
@@ -242,7 +256,38 @@ export function useActionSlot(s: BattleState, slot: number, abilityId: string): 
 
 export function endTurn(s: BattleState): BattleState {
   if (s.phase !== 'kampf') return s;
+  // Gegner (und unkontrollierbare Allys) wenden sich am Zugende ihrem Ziel zu.
+  const unit = currentUnit(s);
+  const target = unit?.targetId ? getUnit(s, unit.targetId) : undefined;
+  if (unit?.pos && target?.pos) s = updateUnit(s, unit.id, { facing: facingTowards(unit.pos, target.pos, facingOf(unit)) });
   return checkOutcome(beginTurn({ ...s, queue: s.queue.slice(1) }));
+}
+
+/** Blickrichtung ändern: im eigenen Zug beliebig oft, Allys außerdem während der Platzierung. */
+export function turnUnit(s: BattleState, id: string, facing: Facing): BattleState {
+  const unit = getUnit(s, id);
+  const allowed =
+    (s.phase === 'platzierung' && unit?.side === 'ally') || (s.phase === 'kampf' && s.turn?.unitId === id);
+  if (!unit || !allowed) throw new RuleError('Die Blickrichtung kann nur im eigenen Zug geändert werden.');
+  return withExplored(updateUnit(s, id, { facing }));
+}
+
+/**
+ * Ein Charakter wird Ziel einer Fähigkeit/eines Effekts. Außerhalb seines Zuges dreht er sich
+ * je nach Regelwerk zur Quelle.
+ */
+export function onTargeted(s: BattleState, targetId: string, sourceId: string, typeIds: string[] = []): BattleState {
+  const target = getUnit(s, targetId);
+  const source = getUnit(s, sourceId);
+  if (!target?.pos || !source?.pos || s.turn?.unitId === targetId || targetId === sourceId) return s;
+  const rule = s.rules.facing;
+  const hostile = target.side !== source.side;
+  const turns =
+    rule.turnWhenTargeted === 'alle' ||
+    (rule.turnWhenTargeted === 'gegnerisch' && hostile) ||
+    (rule.turnWhenTargeted === 'typen' && typeIds.some((t) => rule.typeIds.includes(t)));
+  if (!turns) return s;
+  return withExplored(updateUnit(s, targetId, { facing: facingTowards(target.pos, source.pos, facingOf(target)) }));
 }
 
 /** Zusätzlicher Zug (z. B. Reaktion) direkt nach dem aktuellen. */
@@ -256,22 +301,26 @@ export function moveUnit(s: BattleState, id: string, pos: Pos): BattleState {
   if (!g.isPassable(pos)) throw new RuleError('Das Feld ist nicht begehbar.');
   const other = unitAt(s, pos);
   if (other && other.id !== id) throw new RuleError('Das Feld ist belegt.');
-  return checkOutcome(withExplored(updateUnit(s, id, { pos })));
+  const unit = getUnit(s, id);
+  const facing = unit?.pos ? facingFromStep(unit.pos, pos, facingOf(unit)) : unit?.facing;
+  return checkOutcome(withExplored(updateUnit(s, id, { pos, facing })));
 }
 
 // ---------- Bewusstlosigkeit, Sieg & Niederlage ----------
 
-/** Bewusstlos setzen oder aufwecken (ausgelöst durch den festen Effekt „Bewusstlos“). */
+/** Effekt „Bewusstlos“ erhalten oder verlieren. Ob der Charakter Züge aussetzt, regeln die Bausteine des Effekts. */
 export function setUnconscious(s: BattleState, id: string, unconscious: boolean): BattleState {
   const unit = getUnit(s, id);
   if (!unit || unit.status === 'entfernt') return s;
   if (unconscious === (unit.status === 'bewusstlos')) return s;
-  s = updateUnit(s, id, { status: unconscious ? 'bewusstlos' : 'aktiv', missedTurns: 0 });
-  if (unconscious && s.turn?.unitId === id) {
-    s = checkOutcome(s);
-    if (s.phase === 'kampf') s = beginTurn({ ...s, queue: s.queue.slice(1) });
-  }
-  return checkOutcome(withExplored(s));
+  return checkOutcome(withExplored(updateUnit(s, id, { status: unconscious ? 'bewusstlos' : 'aktiv', unconsciousTurns: 0 })));
+}
+
+/** Züge aussetzen an/aus; wer gerade am Zug ist und aussetzen muss, beendet seinen Zug. */
+export function setSkipsTurns(s: BattleState, id: string, skips: boolean): BattleState {
+  s = updateUnit(s, id, { skipsTurns: skips });
+  if (skips && s.turn?.unitId === id && s.phase === 'kampf') s = checkOutcome(beginTurn({ ...s, queue: s.queue.slice(1) }));
+  return s;
 }
 
 /** Nimmt eine Figur aus dem Kampf (z. B. geflohener Gegner). */

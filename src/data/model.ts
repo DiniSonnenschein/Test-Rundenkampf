@@ -1,3 +1,4 @@
+import { DEFAULT_EFFECT, normalizeEffect, UNCONSCIOUS_ID } from '../engine/effects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID, normalizeResource } from '../engine/resources';
 import { DEFAULT_RULES } from '../engine/rules';
 
@@ -65,7 +66,27 @@ export const BAUSTEINE: CollectionDef[] = [
   { key: 'objekte', label: 'Objekte', singular: 'Objekt', newTitle: 'Neues Objekt', icon: '🎒', visible: true, creatable: true, section: 8 },
   { key: 'gelaende', label: 'Geländearten', singular: 'Geländeart', newTitle: 'Neue Geländeart', icon: '🌲', creatable: true, section: 9 },
   { key: 'faehigkeiten', label: 'Fähigkeiten', singular: 'Fähigkeit', newTitle: 'Neue Fähigkeit', icon: '✨', creatable: true, section: 5 },
-  { key: 'effekte', label: 'Effekte', singular: 'Effekt', newTitle: 'Neuer Effekt', icon: '🔥', creatable: true, section: 4 },
+  {
+    key: 'effekte', label: 'Effekte', singular: 'Effekt', newTitle: 'Neuer Effekt', icon: '🔥', creatable: true, section: 4,
+    defaults: () => structuredClone(DEFAULT_EFFECT) as unknown as Record<string, unknown>,
+    fixedEntries: () => [
+      {
+        id: UNCONSCIOUS_ID,
+        title: 'Bewusstlos',
+        note: '',
+        folderId: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fixed: true,
+        ...structuredClone(DEFAULT_EFFECT),
+        display: { show: false, color: '#6b6b8a' },
+      },
+    ],
+    subtitle: (e) => {
+      const n = normalizeEffect(e).blocks.length;
+      return (e.fixed ? 'Fest · ' : '') + (n === 1 ? '1 Baustein' : `${n} Bausteine`);
+    },
+  },
   {
     key: 'ressourcen', label: 'Ressourcen', singular: 'Ressource', newTitle: 'Neue Ressource', icon: '💧', creatable: true, section: 3,
     defaults: () => structuredClone(DEFAULT_RESOURCE) as unknown as Record<string, unknown>,
@@ -97,7 +118,15 @@ export const SPIELSTAENDE: CollectionDef = {
   key: 'spielstaende', label: 'Spielstand laden', singular: 'Spielstand', newTitle: 'Neuer Spielstand', icon: '💾', section: 14,
 };
 
-export const ALL_DEFS: CollectionDef[] = [...BAUSTEINE, SPIELE, SPIELSTAENDE];
+/** Typen-Listen (verwaltet in den Einstellungen, ergänzbar direkt in den Editoren). */
+export const TYPEN_AKTIONEN: CollectionDef = {
+  key: 'typen-aktionen', label: 'Typen für Fähigkeiten & Effekte', singular: 'Typ', newTitle: 'Neuer Typ', icon: '🏷️', section: 4,
+};
+export const TYPEN_CHARAKTERE: CollectionDef = {
+  key: 'typen-charaktere', label: 'Typen für Allys & Gegner', singular: 'Typ', newTitle: 'Neuer Typ', icon: '🏷️', section: 4,
+};
+
+export const ALL_DEFS: CollectionDef[] = [...BAUSTEINE, SPIELE, SPIELSTAENDE, TYPEN_AKTIONEN, TYPEN_CHARAKTERE];
 
 export function getDef(key: string): CollectionDef | undefined {
   return ALL_DEFS.find((d) => d.key === key);

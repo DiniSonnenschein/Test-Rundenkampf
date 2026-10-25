@@ -1,10 +1,12 @@
 // Regelwerk: alle einstellbaren Grundregeln eines Kampfes.
-// Fest (nicht einstellbar) sind: quadratisches Raster, Nebel & Laterne, Platzierung vor dem Kampf,
+// Fest (nicht einstellbar) sind: quadratisches Raster, 4 Blickrichtungen, Nebel & Laterne, Platzierung vor dem Kampf,
 // feste Initiative-Reihenfolge, Züge aus Aktionen und Sieg, sobald alle Allys auf Siegfeldern stehen.
 // Niemand stirbt: „Bewusstlos“ ist ein fester Effekt; zu lange oder zu viele Bewusstlose → Run verloren (Flucht).
 
 export type LightShape = 'kreis' | 'quadrat';
 export type TieBreak = 'allys-zuerst' | 'gegner-zuerst' | 'abwechselnd';
+/** Wann sich Charaktere außerhalb ihres Zuges zur Quelle einer Fähigkeit/eines Effekts drehen. */
+export type TurnWhenTargeted = 'nie' | 'gegnerisch' | 'alle' | 'typen';
 
 export interface Rules {
   /** Diagonale Bewegung erlaubt. */
@@ -24,6 +26,11 @@ export interface Rules {
   };
   /** Reguläre Züge pro Charakter und Runde. */
   turnsPerRound: number;
+  facing: {
+    turnWhenTargeted: TurnWhenTargeted;
+    /** Typen (Fähigkeiten & Effekte) für 'typen'. */
+    typeIds: string[];
+  };
   defeat: {
     /** Run verloren, wenn ein Ally so viele eigene Züge am Stück bewusstlos verpasst (0 = aus). */
     unconsciousTurns: number;
@@ -38,6 +45,7 @@ export const DEFAULT_RULES: Rules = {
   light: { lanternRadius: 3, shape: 'kreis', rememberExplored: true },
   initiative: { tieBreak: 'allys-zuerst' },
   turnsPerRound: 1,
+  facing: { turnWhenTargeted: 'nie', typeIds: [] },
   defeat: { unconsciousTurns: 2, unconsciousCount: 'alle' },
 };
 
@@ -57,6 +65,10 @@ export function normalizeRules(partial: unknown): Rules {
       tieBreak: p.initiative?.tieBreak ?? d.initiative.tieBreak,
     },
     turnsPerRound: p.turnsPerRound ?? d.turnsPerRound,
+    facing: {
+      turnWhenTargeted: p.facing?.turnWhenTargeted ?? d.facing.turnWhenTargeted,
+      typeIds: p.facing?.typeIds ?? [],
+    },
     defeat: {
       unconsciousTurns: p.defeat?.unconsciousTurns ?? d.defeat.unconsciousTurns,
       unconsciousCount: p.defeat?.unconsciousCount ?? d.defeat.unconsciousCount,

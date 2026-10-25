@@ -129,7 +129,7 @@ export function ListScreen({ def, folderId }: { def: CollectionDef; folderId: st
                 <span className="row-title">{e.title || 'Ohne Titel'}</span>
                 <span className="row-sub muted">
                   {searching && e.folderId && `📁 ${folderPath(col.folders, e.folderId).map((p) => p.name).join(' / ')} · `}
-                  {def.subtitle && `${def.subtitle(e)} · `}
+                  {def.subtitle?.(e) && `${def.subtitle(e)} · `}
                   {formatDate(e.updatedAt)}
                 </span>
               </span>

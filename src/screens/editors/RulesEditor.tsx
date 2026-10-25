@@ -1,4 +1,6 @@
-import { normalizeRules, type LightShape, type Rules, type TieBreak } from '../../engine/rules';
+import { normalizeRules, type LightShape, type Rules, type TieBreak, type TurnWhenTargeted } from '../../engine/rules';
+import { TypePicker } from '../../ui/pickers';
+import { Select } from './shared';
 import { Choice, Stepper, Toggle } from '../../ui/fields';
 import type { EditorProps } from './index';
 import { LightPreview } from './LightPreview';
@@ -70,6 +72,28 @@ export function RulesEditor({ entry, set }: EditorProps) {
       </section>
 
       <section className="card fields">
+        <h2>Blickrichtung</h2>
+        <p className="muted small">
+          4 Richtungen (fest). Ein Charakter blickt automatisch in die Richtung seiner letzten Bewegung und kann sie in seinem Zug beliebig
+          oft ändern. Gegner wenden sich am Ende ihres Zuges ihrem Ziel zu (steht es genau diagonal, ändert sich nichts).
+        </p>
+        <label className="field-label">Außerhalb des eigenen Zuges zur Quelle drehen, wenn Ziel von</label>
+        <Select<TurnWhenTargeted>
+          value={rules.facing.turnWhenTargeted}
+          options={[
+            { value: 'nie', label: 'Nie' },
+            { value: 'gegnerisch', label: 'Gegnerischen Fähigkeiten/Effekten' },
+            { value: 'alle', label: 'Allen Fähigkeiten/Effekten' },
+            { value: 'typen', label: 'Fähigkeiten/Effekten bestimmter Typen' },
+          ]}
+          onChange={(v) => update((r) => ({ ...r, facing: { ...r.facing, turnWhenTargeted: v } }))}
+        />
+        {rules.facing.turnWhenTargeted === 'typen' && (
+          <TypePicker list="typen-aktionen" value={rules.facing.typeIds} onChange={(typeIds) => update((r) => ({ ...r, facing: { ...r.facing, typeIds } }))} />
+        )}
+      </section>
+
+      <section className="card fields">
         <h2>Run verloren</h2>
         <p className="muted small">
           Niemand stirbt – die Gruppe flieht, bevor es so weit kommt. „Bewusstlos“ ist ein fester Effekt (Abschnitt 4).
@@ -102,8 +126,8 @@ export function RulesEditor({ entry, set }: EditorProps) {
       <section className="card">
         <h2>Feste Regeln</h2>
         <ul className="fixed-rules muted">
-          <li>Quadratisches Raster</li>
-          <li>Nebel; Sicht nur durch Licht (Laterne & Licht-Fähigkeiten) und die Eigensicht der Charaktere</li>
+          <li>Quadratisches Raster, 4 Blickrichtungen</li>
+          <li>Nebel; Sicht nur durch Licht (Laterne & Licht-Fähigkeiten) und die Sicht der Charaktere – alle Allys teilen, was sie sehen</li>
           <li>Vor Runde 1: Laternenträger fest, übrige Allys frei im Lichtkegel platzierbar; im nächsten Level wird die Platzierung möglichst wiederholt</li>
           <li>Initiative-Reihenfolge einzelner Charaktere, festgelegt zu Beginn des Levels</li>
           <li>Ein Zug besteht aus beliebig vielen Aktionen (Fähigkeiten)</li>

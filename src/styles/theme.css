@@ -300,3 +300,35 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .resource-bar { flex: 1; height: 12px; border-radius: 6px; background: #ffffff18; overflow: hidden; }
 .resource-bar span { display: block; height: 100%; border-radius: 6px; }
 .resource-bar-value { font-variant-numeric: tabular-nums; font-size: .9rem; }
+
+/* ---------- Abschnitt 4: Effekte ---------- */
+.btn-small { min-height: 40px; font-size: .95rem; padding: 6px 12px; }
+.link-btn { background: none; border: none; padding: 4px; color: var(--accent-hi); font: inherit; font-size: .9rem; cursor: pointer; }
+.link-btn.danger { color: var(--danger); }
+
+.picker { display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 4px 4px 10px; border-radius: 16px;
+  background: var(--surface-hi); border: 1px solid var(--border); font-size: .9rem;
+}
+.chip button { width: 26px; height: 26px; border: none; border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer; }
+
+.area-picker { display: flex; flex-direction: column; gap: 6px; }
+.area-grid { display: grid; gap: 2px; width: 100%; max-width: 320px; margin: 0 auto; }
+.area-cell {
+  aspect-ratio: 1; padding: 0; border: 1px solid var(--border); border-radius: 3px;
+  background: var(--bg-deep); color: #1f1410; font-size: .75rem; cursor: pointer;
+}
+.area-cell.on { background: var(--accent); border-color: var(--accent-hi); }
+.area-cell.center { outline: 2px solid var(--gold); outline-offset: -2px; color: var(--gold); font-weight: 700; }
+.area-cell.center.on { color: #1f1410; }
+.area-footer { display: flex; justify-content: space-between; align-items: center; max-width: 320px; width: 100%; margin: 0 auto; }
+
+.effect-preview { display: grid; place-items: center; padding: 12px; background: var(--bg-deep); border-radius: 10px; }
+.effect-ring { display: grid; place-items: center; width: 64px; height: 64px; border: 4px solid; border-radius: 50%; }
+
+.type-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.type-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.type-list li span { flex: 1; }

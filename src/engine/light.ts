@@ -33,7 +33,11 @@ export function litTiles(g: Grid, sources: LightSource[], shape: LightShape): Se
   return result;
 }
 
-/** Sichtbar = beleuchtet + Eigensicht der Allys (Radius je Charakter, 0 = nur eigenes Feld). */
-export function visibleTiles(g: Grid, sources: LightSource[], viewers: LightSource[], shape: LightShape): Set<string> {
-  return litTiles(g, [...sources, ...viewers], shape);
+/** Sichtbar = beleuchtet + alles, was ein Ally selbst sieht (Felder mit freier Sichtlinie). */
+export function visibleTiles(g: Grid, sources: LightSource[], viewers: { pos: Pos; tiles: Pos[] }[], shape: LightShape): Set<string> {
+  const result = litTiles(g, sources, shape);
+  for (const v of viewers) {
+    for (const t of v.tiles) if (inBounds(g, t) && hasLineOfSight(g, v.pos, t)) result.add(posKey(t));
+  }
+  return result;
 }

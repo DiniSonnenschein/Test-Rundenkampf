@@ -4,6 +4,8 @@ import { clearAllData, reloadAll } from '../data/store';
 import { Header } from '../ui/Header';
 import { useDialog } from '../ui/Dialog';
 import { routes } from '../router';
+import { TYPEN_AKTIONEN, TYPEN_CHARAKTERE } from '../data/model';
+import { TypeManager } from './TypeManager';
 
 export function SettingsScreen() {
   const dialog = useDialog();
@@ -52,6 +54,9 @@ export function SettingsScreen() {
   return (
     <main className="screen">
       <Header title="Einstellungen" back={routes.start()} />
+
+      <TypeManager def={TYPEN_AKTIONEN} hint="Gruppieren Fähigkeiten und Effekte (z. B. „positiv“, „Feuer“, „Bewegung“)." />
+      <TypeManager def={TYPEN_CHARAKTERE} hint="Gruppieren Allys und Gegner (z. B. „Untot“, „Tier“)." />
 
       <section className="card">
         <h2>Daten sichern</h2>
