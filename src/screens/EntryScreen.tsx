@@ -1,7 +1,7 @@
 // Bearbeiten eines Eintrags. Jede Änderung wird sofort gespeichert.
 import { useEffect, useRef } from 'react';
 import { folderPath, sortFolders } from '../data/collection';
-import { DEFAULT_LOOK, SPIELSTAENDE, type CollectionDef, type Entry } from '../data/model';
+import { DEFAULT_LOOK, type CollectionDef, type Entry } from '../data/model';
 import { patchEntry, useCollection } from '../data/store';
 import { navigate, routes } from '../router';
 import { ColorWheel } from '../ui/ColorWheel';
@@ -87,9 +87,7 @@ export function EntryScreen({ def, id }: { def: CollectionDef; id: string }) {
         <Editor entry={entry} set={set} />
       ) : (
         <section className="card placeholder muted">
-          {def.key === SPIELSTAENDE.key
-            ? 'Spielstand-Details folgen in Abschnitt 14.'
-            : `Weitere Felder für ${def.label} folgen in Abschnitt ${def.section}.`}
+          {`Weitere Felder für ${def.label} folgen in Abschnitt ${def.section}.`}
         </section>
       )}
 

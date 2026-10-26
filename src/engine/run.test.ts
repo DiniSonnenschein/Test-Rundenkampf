@@ -12,7 +12,7 @@ import { normalizeLevel } from './level';
 import { DEFAULT_OBJECT } from './objects';
 import { DEFAULT_RESOURCE, INITIATIVE_ID } from './resources';
 import { DEFAULT_RULES } from './rules';
-import { beginCombat, canUndo, createRun, finishTurn, nextLevel, toCtx, fromCtx, undo, type RunState } from './run';
+import { beginCombat, canUndo, createRun, finishTurn, nextLevel, refreshTemplates, runSummary, toCtx, fromCtx, undo, type RunState } from './run';
 import { DEFAULT_TERRAIN } from './terrain';
 
 const look = { shape: 'kreis', color: '#fff', size: 1 };
@@ -162,5 +162,25 @@ describe('Spielablauf', () => {
   it('Platzierung im Lichtkegel', () => {
     const run = createRun(game, makeDefs());
     expect(() => placeUnit(run.battle, 'm1', { x: 0, y: 0 })).toThrow();
+  });
+
+  it('Vorlagen aktualisieren: neue Werte aus den Editoren, Spielwerte bleiben', () => {
+    let run = beginCombat(createRun(game, makeDefs()));
+    run = act(run, 'laufen', [{ x: 1, y: 4 }]);
+    run = fromCtx(run, changeResource(toCtx(run), 'm1', 'lp', -3, false));
+    const fresh = makeDefs();
+    fresh.abilities.schlag = { ...fresh.abilities.schlag, title: 'Hieb' };
+    fresh.allys.ritter = { ...fresh.allys.ritter, title: 'Paladin', sightArea: ['0,0', '0,-1'], actions: [{ name: 'Angriff', abilities: [{ abilityId: 'schlag', maxUses: 1 }] }] };
+    delete (fresh.enemies as Record<string, unknown>).goblin;
+    const next = refreshTemplates(run, fresh);
+    const u = getUnit(next.battle, 'm1')!;
+    expect(next.defs.abilities.schlag.title).toBe('Hieb');
+    expect(u.name).toBe('Paladin');
+    expect(u.actions.map((a) => a.name)).toEqual(['Angriff']);
+    expect(u.sightArea).toEqual(['0,0', '0,-1']);
+    expect(u.values!.lp).toBe(7);
+    expect(u.pos).toEqual({ x: 1, y: 4 });
+    expect(next.defs.enemies.goblin.title).toBe('Goblin'); // gelöscht → alte Fassung bleibt
+    expect(runSummary(next)).toEqual({ dungeon: null, level: 'Gang', status: 'Runde 1', allys: ['Paladin'] });
   });
 });

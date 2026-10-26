@@ -86,7 +86,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 11 | Dungeon-Editor | ✅ |
 | 12 | Neues Spiel (Setup) | ✅ |
 | 13 | Spielmodus (Kampf-Oberfläche) | ✅ |
-| 14 | Speichern & Laden | ⬜ |
+| 14 | Speichern & Laden | ✅ |
 | 15 | Balancing-Werkzeuge | ⬜ |
 | 16 | Import / Export & Datenaustausch | ⬜ |
 
@@ -580,10 +580,20 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 
 ### 14 – Speichern & Laden
 **Ziel:** Spielstände jederzeit sichern und fortsetzen.
-- Mehrere Speicherplätze, Benennung, Datum
-- Was passiert, wenn Inhalte im Erstell-Modus nach dem Speichern geändert wurden? (Stand einfrieren oder aktuelle Version verwenden?)
 
-**Offene Punkte / Entscheidungen:** –
+**Festgelegt:**
+- **Automatisch:** Jedes Spiel speichert laufend in seinen Spielstand „Name – Datum“ (Level-Tests: „Test: Level – Datum“).
+- **Höchstens 10 Spielstände je Spiel** (bzw. je getestetem Level): beim Start eines neuen werden die ältesten darüber automatisch gelöscht.
+- **Sichern eines Zwischenstands:** Spielstand in der Liste **duplizieren** (kein eigener Speicher-Knopf).
+- **Liste:** zuletzt gespielte oben; Anzeige **Dungeon · Level · Runde (bzw. Platzierung/Zwischenstation/gewonnen/verloren) · Allys** und Datum.
+- **Startbildschirm:** Knopf **„Weiterspielen“** mit dem zuletzt gespielten Spielstand.
+- **Eingefroren mit Aktualisieren-Knopf:** Ein Spielstand nutzt die Vorlagen vom Start. **„Vorlagen aktualisieren“** (am Spielstand) übernimmt die aktuellen Editor-Werte (Fähigkeiten, Effekte, Charaktere, Objekte, Regelwerk, Dungeon …). Was im Spiel entstanden ist – Werte, Effekte, Gegenstände, Positionen – bleibt. Gelöschte Vorlagen bleiben in der alten Fassung; das laufende Level behält seine Map (Level-Änderungen wirken ab dem nächsten Level).
+- **Spielstand-Seite:** Dungeon, Level, Stand, Allys mit Werten, „Fortsetzen“, „Vorlagen aktualisieren“.
+
+**Umsetzung:**
+- `src/game/saves.ts` – Anlegen mit Begrenzung, zuletzt gespielter
+- `src/engine/run.ts` – `refreshTemplates`, `runSummary` (mit Tests)
+- `src/screens/editors/SaveEditor.tsx`, `src/screens/StartScreen.tsx`, `src/screens/ListScreen.tsx`
 
 ### 15 – Balancing-Werkzeuge *(optional)*
 **Ziel:** Das Austesten und Auswerten erleichtern.

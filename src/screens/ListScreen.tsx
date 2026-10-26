@@ -26,7 +26,9 @@ export function ListScreen({ def, folderId }: { def: CollectionDef; folderId: st
   const searching = query.trim() !== '';
 
   const folders = sortFolders(col.folders.filter((f) => f.parentId === (folder?.id ?? null)));
-  const entries = searching ? searchEntries(col.entries, query) : sortEntries(col.entries.filter((e) => e.folderId === (folder?.id ?? null)));
+  const listed = searching ? searchEntries(col.entries, query) : sortEntries(col.entries.filter((e) => e.folderId === (folder?.id ?? null)));
+  // Spielstände: der zuletzt gespielte oben.
+  const entries = def.key === 'spielstaende' ? [...listed].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) : listed;
 
   function newEntry() {
     const entry = createEntry(def, folder?.id ?? null);

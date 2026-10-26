@@ -1,12 +1,12 @@
 // Level-Einstellungen: Größe, Grundboden, Farben, Vorschau und Prüfung. Die Map selbst wird im Map-Editor bearbeitet.
-import { createEntry, newId, sortEntries } from '../../data/collection';
-import { SPIELSTAENDE, type Entry } from '../../data/model';
-import { getCollection, saveEntry } from '../../data/store';
+import { newId, sortEntries } from '../../data/collection';
+import type { Entry } from '../../data/model';
+import { getCollection } from '../../data/store';
 import { normalizeGame, type TeamMember } from '../../engine/game';
 import { createRun } from '../../engine/run';
+import { createSave } from '../../game/saves';
 import { buildDefs } from '../../game/snapshot';
 import { useDialog } from '../../ui/Dialog';
-import { formatDate } from '../../ui/format';
 import { MemberCard } from './GameEditor';
 import { MAX_LEVEL_SIZE, normalizeLevel, resize, validateLevel, type LevelColors, type LevelFields } from '../../engine/level';
 import { navigate, routes } from '../../router';
@@ -104,8 +104,7 @@ function TestSection({ entry, set }: EditorProps) {
   function start() {
     const game = normalizeGame({ regelwerkId: t.regelwerkId, content: { kind: 'level', levelId: entry.id }, team, lanternMemberId: lantern });
     const run = createRun(game, buildDefs(game));
-    const save = { ...createEntry(SPIELSTAENDE, null), title: `Test: ${entry.title} – ${formatDate(new Date().toISOString())}`, levelId: entry.id, run };
-    saveEntry(SPIELSTAENDE.key, save);
+    const save = createSave(`Test: ${entry.title}`, run, { levelId: entry.id });
     navigate(routes.game(save.id));
   }
 

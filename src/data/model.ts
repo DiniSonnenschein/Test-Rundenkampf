@@ -1,3 +1,4 @@
+import { runSummary, type RunState } from '../engine/run';
 import { DEFAULT_ABILITY, normalizeAbility } from '../engine/abilities';
 import { DEFAULT_BEHAVIOR } from '../engine/behavior';
 import { DEFAULT_CHARACTER } from '../engine/characters';
@@ -173,6 +174,11 @@ export const SPIELE: CollectionDef = {
 
 export const SPIELSTAENDE: CollectionDef = {
   key: 'spielstaende', label: 'Spielstand laden', singular: 'Spielstand', newTitle: 'Neuer Spielstand', icon: '💾', section: 14,
+  subtitle: (e) => {
+    if (!e.run) return '';
+    const s = runSummary(e.run as RunState);
+    return [s.dungeon, s.level, s.status, s.allys.join(', ')].filter(Boolean).join(' · ');
+  },
 };
 
 /** Typen-Listen (verwaltet in den Einstellungen, ergänzbar direkt in den Editoren). */

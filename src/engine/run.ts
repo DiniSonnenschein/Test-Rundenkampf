@@ -61,6 +61,8 @@ export interface RunState {
   globalStarts?: Record<string, number>;
   /** Zwischenstation nach einem Dungeon-Level (statt eines Kampfes). */
   interlude?: InterludeState;
+  /** Spiel-Konfiguration vom Start (für „Vorlagen aktualisieren“). */
+  game?: GameFields;
 }
 
 const MAX_HISTORY = 60;
@@ -232,6 +234,7 @@ export function createRun(game: GameFields, defs: Defs): RunState {
     history: [],
     levelEvents: game.levelEvents,
     globalStarts: globals,
+    game,
   };
   // Start-Effekte der Allys.
   let r = setupLevel(run);
@@ -442,3 +445,80 @@ export function aiTurnStep(run: RunState): RunState | null {
 }
 export const victoryTile = (run: RunState, x: number, y: number) => !!run.levelId && isVictory(run.defs.levels[run.levelId], { x, y });
 export const initiativeOf = (u: Unit) => u.values?.[INITIATIVE_ID] ?? 0;
+
+// ---------- Vorlagen aktualisieren ----------
+
+/**
+ * Übernimmt die aktuellen Vorlagen aus den Editoren in ein laufendes Spiel. Was im Spiel entstanden ist
+ * (Werte, Effekte, Gegenstände, Positionen), bleibt. Gelöschte Vorlagen bleiben in der alten Fassung erhalten.
+ * Das gerade laufende Level behält seine Map; Änderungen an Leveln wirken ab dem nächsten Level.
+ */
+export function refreshTemplates(run: RunState, fresh: Defs): RunState {
+  const old = run.defs;
+  const merge = <T>(a: Record<string, T>, b: Record<string, T>) => ({ ...a, ...b });
+  const levels = merge(old.levels, fresh.levels);
+  if (run.levelId && !run.interlude && old.levels[run.levelId]) levels[run.levelId] = old.levels[run.levelId];
+  const defs: Defs = {
+    rules: fresh.rules,
+    resources: merge(old.resources, fresh.resources),
+    effects: merge(old.effects, fresh.effects),
+    abilities: merge(old.abilities, fresh.abilities),
+    objects: merge(old.objects, fresh.objects),
+    terrains: merge(old.terrains, fresh.terrains),
+    allys: merge(old.allys, fresh.allys),
+    enemies: merge(old.enemies, fresh.enemies),
+    levels,
+    dungeon: fresh.dungeon ?? old.dungeon,
+    typeNames: merge(old.typeNames, fresh.typeNames),
+  };
+  const update = (b: BattleState): BattleState => {
+    if (!b) return b;
+    let ctx: Ctx = { defs, battle: { ...b, rules: defs.rules }, globals: run.globals, log: [] };
+    ctx = {
+      ...ctx,
+      battle: {
+        ...ctx.battle,
+        units: ctx.battle.units.map((u) => {
+          const t = u.templateId ? (u.side === 'ally' ? defs.allys[u.templateId] : defs.enemies[u.templateId]) : undefined;
+          if (!t) return u;
+          return { ...u, name: t.title, size: t.size, typeIds: t.typeIds, base: { sightArea: t.sightArea, collision: t.collision } };
+        }),
+      },
+    };
+    for (const u of ctx.battle.units) ctx = refreshDerived(ctx, u.id);
+    return refreshMap({ defs, levelId: run.levelId, battle: ctx.battle });
+  };
+  const snap = (s: Snapshot): Snapshot => ({ ...s, battle: update(s.battle) });
+  return {
+    ...run,
+    defs,
+    battle: run.interlude ? run.battle : update(run.battle),
+    history: run.interlude ? run.history : run.history.map(snap),
+    levelStart: run.levelStart && !run.interlude ? snap(run.levelStart) : run.levelStart,
+    log: [...run.log, '↻ Vorlagen aktualisiert'],
+  };
+}
+
+// ---------- Übersicht ----------
+
+/** Kurzinfo für die Spielstand-Liste: Dungeon, Level, Runde bzw. Stand, Allys. */
+export function runSummary(run: RunState): { dungeon: string | null; level: string; status: string; allys: string[] } {
+  const d = run.defs;
+  const status = run.interlude
+    ? 'Zwischenstation'
+    : run.result === 'run-gewonnen'
+      ? 'gewonnen'
+      : run.result === 'run-verloren'
+        ? 'verloren'
+        : run.result === 'level-gewonnen'
+          ? 'Level geschafft'
+          : run.battle?.phase === 'platzierung'
+            ? 'Platzierung'
+            : `Runde ${run.battle?.round ?? 1}`;
+  return {
+    dungeon: run.content.kind === 'dungeon' ? d.dungeon?.title ?? null : null,
+    level: run.levelId ? d.levels[run.levelId]?.title ?? '?' : '?',
+    status,
+    allys: run.team.map((m) => d.allys[m.allyId]?.title ?? '?'),
+  };
+}

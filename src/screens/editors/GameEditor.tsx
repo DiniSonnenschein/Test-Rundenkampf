@@ -2,13 +2,11 @@
 import { useState } from 'react';
 import { newId, sortEntries } from '../../data/collection';
 import type { Entry } from '../../data/model';
-import { getCollection, saveEntry, useCollection } from '../../data/store';
-import { createEntry } from '../../data/collection';
-import { SPIELSTAENDE } from '../../data/model';
+import { getCollection, useCollection } from '../../data/store';
 import { createRun } from '../../engine/run';
+import { createSave } from '../../game/saves';
 import { buildDefs } from '../../game/snapshot';
 import { navigate, routes } from '../../router';
-import { formatDate } from '../../ui/format';
 import { normalizeCharacter } from '../../engine/characters';
 import { normalizeDungeon } from '../../engine/dungeon';
 import { contentLevels, memberItems, memberResources, normalizeGame, validateGame, type GameContent, type GameFields, type LevelEvent, type TeamMember } from '../../engine/game';
@@ -163,8 +161,7 @@ export function GameEditor({ entry, set }: EditorProps) {
 
   function start() {
     const run = createRun(g, buildDefs(g));
-    const save = { ...createEntry(SPIELSTAENDE, null), title: `${entry.title} – ${formatDate(new Date().toISOString())}`, gameId: entry.id, run };
-    saveEntry(SPIELSTAENDE.key, save);
+    const save = createSave(entry.title, run, { gameId: entry.id });
     navigate(routes.game(save.id));
   }
 
