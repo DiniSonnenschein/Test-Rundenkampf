@@ -37,7 +37,10 @@ export interface Entry {
 export interface Look {
   shape: string;
   color: string;
+  /** Breite in Feldern. */
   size: number;
+  /** Höhe in Feldern (ohne Angabe = Breite). */
+  height?: number;
 }
 
 export interface Collection {

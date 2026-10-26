@@ -1,6 +1,6 @@
 // Verarbeitung von Ereignissen: Effekt-Auslöser/-Beendigungen, Reaktionen, Objekt- und Gelände-Wirkungen.
 import { DEFAULT_ABILITY, type AbilityFields, type AbilityTrigger } from './abilities';
-import { facingOf, getUnit, unitTiles, type Unit } from './battle';
+import { facingOf, getUnit, objectTiles, unitTiles, type Unit } from './battle';
 import { pickRule } from './behavior';
 import { hasBlock, type EffectCondition, type EffectEnding } from './effects';
 import type { GameEvent, PendingReaction } from './events';
@@ -86,7 +86,7 @@ function areaMembers(ctx: Ctx, u: Unit, cond: Extract<EffectCondition, { kind: '
   const ok = (id: string | undefined, types: string[]) => sel.all || (!!id && sel.ids.includes(id)) || types.some((t) => sel.typeIds.includes(t));
   if (cond.entity === 'objekt') {
     return (ctx.battle.objects ?? [])
-      .filter((o) => inArea(u, cond.area, o.pos) && ok(o.objectId, ctx.defs.objects[o.objectId]?.typeIds ?? []))
+      .filter((o) => objectTiles(o).some((t) => inArea(u, cond.area, t)) && ok(o.objectId, ctx.defs.objects[o.objectId]?.typeIds ?? []))
       .map((o) => o.id);
   }
   const side = cond.entity === 'ally' ? 'ally' : 'enemy';

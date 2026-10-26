@@ -632,11 +632,11 @@ export function ShapeIcon({ shape, color, size = 32 }: { shape: string; color: s
   );
 }
 
-/** Form innerhalb einer anderen SVG-Zeichnung (z. B. auf der Map). */
-export function ShapeInSvg({ shape, color, x, y, size, opacity }: { shape: string; color: string; x: number; y: number; size: number; opacity?: number }) {
+/** Form innerhalb einer anderen SVG-Zeichnung (z. B. auf der Map). Mit height: in einem Rechteck zentriert (Seitenverhältnis bleibt). */
+export function ShapeInSvg({ shape, color, x, y, size, height, opacity }: { shape: string; color: string; x: number; y: number; size: number; height?: number; opacity?: number }) {
   const def = SHAPES.find((s) => s.key === shape) ?? SHAPES[0];
   return (
-    <svg x={x} y={y} width={size} height={size} viewBox="-50 -50 100 100" opacity={opacity} overflow="visible">
+    <svg x={x} y={y} width={size} height={height ?? size} viewBox="-50 -50 100 100" opacity={opacity} overflow="visible">
       {def.render(color)}
     </svg>
   );

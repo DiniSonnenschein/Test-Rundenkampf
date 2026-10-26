@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCollection, patchEntry, useCollection } from '../../data/store';
 import {
-  actionState, currentUnit, getUnit, placeUnit, placementArea, turnUnit, visible, type Unit,
+  actionState, currentUnit, dimsOf, getUnit, placeUnit, placementArea, turnUnit, visible, type Unit,
 } from '../../engine/battle';
 import { titleOf } from '../../engine/defs';
 import type { AbilityFields } from '../../engine/abilities';
@@ -101,13 +101,13 @@ export function GameScreen({ id }: { id: string }) {
 
   // Kamera zur Figur, die am Zug ist.
   useEffect(() => {
-    if (current?.pos && pz.ready) pz.centerOn(current.pos, current.size ?? 1);
+    if (current?.pos && pz.ready) pz.centerOn(current.pos, dimsOf(current).w, dimsOf(current).h);
     setUi({ kind: 'aktionen' });
   }, [current?.id, battle?.round, pz.ready]);
 
   // Bei einer Reaktion: Kamera zum reagierenden Ally.
   useEffect(() => {
-    if (reactor?.pos && pz.ready) pz.centerOn(reactor.pos, reactor.size ?? 1);
+    if (reactor?.pos && pz.ready) pz.centerOn(reactor.pos, dimsOf(reactor).w, dimsOf(reactor).h);
   }, [reactor?.id, pending]);
 
   // KI-Züge (Gegner und Allys mit Verhaltens-Effekt): Schritt für Schritt, bis die KI den Zug beendet.
@@ -381,8 +381,9 @@ export function GameScreen({ id }: { id: string }) {
     if (ui.kind === 'ziel') return null;
     const center = pending ? reactor : allyTurn ? current : undefined;
     if (!center?.pos || (!pending && !allyTurn)) return null;
-    const n = center.size ?? 1;
-    const c = pz.toScreen({ x: center.pos.x + n / 2, y: center.pos.y + n / 2 });
+    const { w, h } = dimsOf(center);
+    const n = Math.max(w, h);
+    const c = pz.toScreen({ x: center.pos.x + w / 2, y: center.pos.y + h / 2 });
     const opts = pending ? reactionOptions() : [];
     const items = pending
       ? [

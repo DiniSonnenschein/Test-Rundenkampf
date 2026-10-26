@@ -16,6 +16,8 @@ export interface Look {
   shape: string;
   color: string;
   size: number;
+  /** Höhe in Feldern (ohne Angabe = Breite). */
+  height?: number;
 }
 
 export interface Defs {

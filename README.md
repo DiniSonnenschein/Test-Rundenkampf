@@ -142,7 +142,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - **Darstellung** für Allys, Gegner und Objekte (sichtbare Entitäten im Spiel):
   - **Form** – Auswahl aus vorgespeicherten Vektorformen (vorläufig 8 Grundformen: Kreis, Quadrat, Dreieck, Raute, Fünfeck, Sechseck, Stern, Kreuz; die endgültige Formen-Bibliothek wird später ausgearbeitet)
   - **Farbe** – Farbrad mit Helligkeitsregler, Hex-Eingabe und Herbst-Farbvorschlägen
-  - **Größe** – Standard 1, in Schritten anpassbar
+  - **Größe** – Breite × Höhe in Feldern (je 1–4, Standard 1×1)
 - **Navigation:** Zurück-Pfeil oben links; die Android-Zurück-Taste funktioniert ebenfalls.
 - **Neues Spiel:** Liste von Spiel-Konfigurationen (gleiche Funktionen wie im Editor). So lassen sich Test-Setups speichern, duplizieren und variieren. „Spielstand laden“ listet die beim Spielen gespeicherten Stände (dort kein „+ Neu“).
 
@@ -199,7 +199,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 - Spielbar wird der Ablauf mit der Kampf-Oberfläche (Abschnitt 13).
 
 **Offene Punkte (für spätere Abschnitte):**
-- ~~Größe > 1~~ → geklärt: Größe 2 belegt 2×2 Felder (Abschnitt 6)
+- ~~Größe > 1~~ → geklärt: Breite × Höhe, z. B. 1×2 oder 2×2 (Abschnitt 6)
 - ~~Durch Figuren hindurchziehen~~ → geklärt über „Kollision“ (pro Charakter/Objekt) und den Effekt-Baustein „Keine Kollision“
 
 ### 3 – Ressourcen & Attribute
@@ -352,7 +352,7 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 
 **Hindernisse:** Ob ein Charakter oder Objekt ein Hindernis ist (also eine „Kollision“ hat), wird in seinem Editor eingestellt. Ohne Kollision können sich Figuren ein Feld teilen (Effekt-Baustein „Keine Kollision“).
 
-**Sicht der Gegner:** Gegner sehen im Nebel nur ihr eigenes Sichtfeld; stehen sie im Licht, sehen sie zusätzlich alles im Licht (Ausnahme: „Nicht wahrnehmbar“).
+**Sicht der Gegner:** Gegner sehen im Nebel nur ihr eigenes Sichtfeld. Stehen sie im Licht (Laterne, leuchtende Objekte/Gelände), sehen sie zusätzlich die beleuchteten Felder, die **ohne Nebel dazwischen** mit ihrem Licht zusammenhängen (über Eck nur, wenn diagonale Bewegung erlaubt ist) und zu denen sie **freie Sicht** haben (Wände und Schatten werfende Objekte blockieren). Ein Fackelkreis, der durch Dunkelheit vom Laternenlicht getrennt ist, zeigt also nicht den Laternenbereich (Ausnahme: „Nicht wahrnehmbar“).
 
 **Umsetzung:**
 - `src/engine/abilities.ts` – Datenmodell, Kostenberechnung und Flugbahn mit Abprallen (mit Tests)
@@ -362,7 +362,7 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 ### 6 – Allys
 **Ziel:** Spielbare Charaktere anlegen (Charakter-Editor; Gegner nutzen ihn in Abschnitt 7 mit zusätzlichen Feldern).
 
-**Darstellung:** Form, Farbe, **Größe** (nur ganze Zahlen; Größe 2 belegt 2×2 Felder, die Kollision wächst mit). Bei großen Figuren werden Reichweite, Sicht und andere Bereiche von **jedem** belegten Feld aus gemessen (Vereinigung).
+**Darstellung:** Form, Farbe, **Größe als Breite × Höhe** (je 1–4; z. B. 1×2 belegt zwei Felder übereinander, die Kollision wächst mit). Die Form dreht **nicht** mit der Blickrichtung; das Feld oben links ist die Position. Bei großen Figuren werden Reichweite, Sicht und andere Bereiche von **jedem** belegten Feld aus gemessen (Vereinigung).
 
 **Grundsätzliches:** Typen (Liste „Allys & Gegner“) · **Kollision** ja/nein (ist Hindernis, belegt seine Felder) · **Rucksackplätze** (individuell) · **Start-Gegenstände** (ob Gegenstände in einem Platz stapelbar sind, legt das Objekt fest)
 
@@ -422,7 +422,7 @@ Alle Bewegungsrichtungen sind unabhängig von den Blickrichtungen von Anwender u
 ### 8 – Objekte / Gegenstände
 **Ziel:** Alles, was kein Charakter ist – Gegenstände für den Rucksack und Dinge auf der Map.
 
-**Grundsätzliches:** Darstellung (Form, Farbe, Größe) · Typen (Liste „Objekte“) · **Kollision** (Hindernis für Bewegung und Fähigkeiten) · **wirft Schatten** · **sammelbar** (Rucksack) · **tragbar** · **stapelbar** im Rucksack (max. pro Platz) · **verborgen** (sichtbar erst nach dem Aufdecken, dann bis Levelende)
+**Grundsätzliches:** Darstellung (Form, Farbe, **Größe Breite × Höhe** – große Objekte belegen alle ihre Felder: Kollision, Schatten, Licht, Treffer; ob sammelbar, entscheidet weiter der Schalter) · Typen (Liste „Objekte“) · **Kollision** (Hindernis für Bewegung und Fähigkeiten) · **wirft Schatten** · **sammelbar** (Rucksack) · **tragbar** · **stapelbar** im Rucksack (max. pro Platz) · **verborgen** (sichtbar erst nach dem Aufdecken, dann bis Levelende)
 
 **Licht:** Lichtquelle mit Leuchtbereich (Bereichs-Auswahl, Blick nach oben); leuchtet auch getragen bzw. im Rucksack ja/nein.
 
@@ -561,7 +561,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 
 **KI (festgelegt in Abschnitt 8, umgesetzt in 13b):**
 - Kein Zufall: gleiche Lage → gleiches Handeln.
-- Wahrnehmung: eigenes Sichtfeld; steht der Gegner im Licht, sieht er alles Beleuchtete. Gesehene Allys werden gemerkt (für „letzte bekannte Position“).
+- Wahrnehmung: eigenes Sichtfeld; steht der Gegner im Licht, sieht er das zusammenhängende Licht um sich (mit freier Sicht, siehe Abschnitt 7). Gesehene Allys werden gemerkt (für „letzte bekannte Position“).
 - Hauptziel nach der Prioritätenliste (nur erreichbare); „bis ungültig“ behält es, solange es wahrgenommen wird und nicht bewusstlos ist.
 - Regeln von oben nach unten: die erste passende wird ausgeführt, dann von vorne geprüft, bis keine mehr passt. Ohne Regeln: Hauptziel angreifen, sonst darauf zu laufen.
 - Ohne Hauptziel: Patrouille (Wegpunkte, Rundweg oder hin & zurück), letzte bekannte Position, zum Licht oder stehen bleiben.

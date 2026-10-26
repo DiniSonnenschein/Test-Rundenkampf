@@ -1,6 +1,6 @@
 // Laufzeit: Ressourcen, Events und Effekte während eines Kampfes.
 import type { Stats } from './stats';
-import { getUnit, removeUnit, setSkipsTurns, setUnconscious, type BattleState, type Unit } from './battle';
+import { getUnit, mapObject, removeUnit, setSkipsTurns, setUnconscious, type BattleState, type Unit } from './battle';
 export type { Source } from './events';
 import type { Defs } from './defs';
 import { titleOf } from './defs';
@@ -132,7 +132,7 @@ export function destroyUnit(ctx: Ctx, unitId: string, reason: 'zerstoert' | 'flu
   if (u.pos) {
     for (const it of loot) {
       if (!it.objectId || !ctx.defs.objects[it.objectId]) continue;
-      for (let i = 0; i < it.count; i++) objects = [...objects, { id: `beute-${unitId}-${it.objectId}-${i}`, objectId: it.objectId, pos: u.pos, hidden: false }];
+      for (let i = 0; i < it.count; i++) objects = [...objects, mapObject(ctx.defs.objects[it.objectId], { id: `beute-${unitId}-${it.objectId}-${i}`, objectId: it.objectId, pos: u.pos, hidden: false })];
     }
   }
   ctx = { ...ctx, battle: { ...removeUnit(ctx.battle, unitId), objects } };
@@ -145,7 +145,7 @@ export function replaceUnit(ctx: Ctx, unitId: string, kind: 'ally' | 'gegner' | 
   if (!u?.pos) return ctx;
   if (kind === 'objekt') {
     if (!ctx.defs.objects[id]) return ctx;
-    ctx = { ...ctx, battle: { ...removeUnit(ctx.battle, unitId), objects: [...(ctx.battle.objects ?? []), { id: `ersetzt-${unitId}`, objectId: id, pos: u.pos, hidden: false }] } };
+    ctx = { ...ctx, battle: { ...removeUnit(ctx.battle, unitId), objects: [...(ctx.battle.objects ?? []), mapObject(ctx.defs.objects[id], { id: `ersetzt-${unitId}`, objectId: id, pos: u.pos, hidden: false })] } };
     return log(ctx, `${u.name} wird zu ${titleOf(ctx.defs, id)}.`);
   }
   const d = ctx.defs.enemies[id] ?? ctx.defs.allys[id];
@@ -155,6 +155,7 @@ export function replaceUnit(ctx: Ctx, unitId: string, kind: 'ally' | 'gegner' | 
     templateId: id,
     actions: d.actions,
     size: d.size,
+    height: d.height,
     typeIds: d.typeIds,
     sightArea: d.sightArea,
     base: { sightArea: d.sightArea, collision: d.collision },

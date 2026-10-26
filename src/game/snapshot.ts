@@ -18,7 +18,7 @@ function map<T>(key: string, fn: (e: Entry) => T): Record<string, T & { title: s
   return Object.fromEntries(getCollection(key).entries.map((e) => [e.id, { ...fn(e), title: e.title }]));
 }
 
-const look = (e: Entry) => ({ shape: String(e.shape ?? 'kreis'), color: String(e.color ?? '#d9772b'), size: tileSize(e.size) });
+const look = (e: Entry) => ({ shape: String(e.shape ?? 'kreis'), color: String(e.color ?? '#d9772b'), size: tileSize(e.size), height: tileSize(e.height ?? e.size) });
 
 export function buildDefs(game: GameFields): Defs {
   const ruleset = getCollection('regelwerke').entries.find((e) => e.id === game.regelwerkId);

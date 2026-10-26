@@ -481,3 +481,4 @@ p { margin: 0 0 1em; line-height: 1.5; }
 .log-list .log-turn { margin-top: 6px; font-weight: 600; color: var(--accent, #e0a83a); }
 .log-list .log-head { margin-top: 8px; font-weight: 700; }
 .log-list .log-debug { color: #9fc3e0; }
+.size-fields { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }

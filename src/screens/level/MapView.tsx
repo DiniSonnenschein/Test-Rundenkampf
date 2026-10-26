@@ -60,22 +60,25 @@ export function MapView({
       {l.objects.map((o) => {
         const entry = lookups.object(o.objectId);
         const hidden = o.hidden ?? (entry ? normalizeObject(entry).hidden : false);
+        const w = tileSize(entry?.size);
+        const h = tileSize(entry?.height ?? entry?.size);
         return (
           <g key={o.id}>
-            <ShapeInSvg shape={String(entry?.shape ?? 'kreis')} color={String(entry?.color ?? '#888')} x={o.pos.x + 0.1} y={o.pos.y + 0.1} size={0.8} opacity={hidden ? 0.45 : 1} />
-            {hidden && <rect x={o.pos.x + 0.06} y={o.pos.y + 0.06} width={0.88} height={0.88} fill="none" stroke="#fff" strokeWidth={0.04} strokeDasharray="0.1 0.08" />}
-            {o.id === selectedId && <rect x={o.pos.x} y={o.pos.y} width={1} height={1} fill="none" stroke="#fff" strokeWidth={0.08} />}
+            <ShapeInSvg shape={String(entry?.shape ?? 'kreis')} color={String(entry?.color ?? '#888')} x={o.pos.x + 0.1} y={o.pos.y + 0.1} size={w - 0.2} height={h - 0.2} opacity={hidden ? 0.45 : 1} />
+            {hidden && <rect x={o.pos.x + 0.06} y={o.pos.y + 0.06} width={w - 0.12} height={h - 0.12} fill="none" stroke="#fff" strokeWidth={0.04} strokeDasharray="0.1 0.08" />}
+            {o.id === selectedId && <rect x={o.pos.x} y={o.pos.y} width={w} height={h} fill="none" stroke="#fff" strokeWidth={0.08} />}
           </g>
         );
       })}
       {l.enemies.map((e) => {
         const entry = lookups.enemy(e.enemyId);
-        const n = tileSize(entry?.size);
+        const w = tileSize(entry?.size);
+        const h = tileSize(entry?.height ?? entry?.size);
         return (
           <g key={e.id}>
-            <ShapeInSvg shape={String(entry?.shape ?? 'kreis')} color={String(entry?.color ?? '#888')} x={e.pos.x + 0.08 * n} y={e.pos.y + 0.08 * n} size={n * 0.84} />
-            <polygon points={ARROW[e.facing]} transform={`translate(${e.pos.x} ${e.pos.y}) scale(${n})`} fill="#fff" stroke="#000" strokeWidth={0.02} />
-            {e.id === selectedId && <rect x={e.pos.x} y={e.pos.y} width={n} height={n} fill="none" stroke="#fff" strokeWidth={0.08} />}
+            <ShapeInSvg shape={String(entry?.shape ?? 'kreis')} color={String(entry?.color ?? '#888')} x={e.pos.x + 0.08} y={e.pos.y + 0.08} size={w - 0.16} height={h - 0.16} />
+            <polygon points={ARROW[e.facing]} transform={`translate(${e.pos.x} ${e.pos.y}) scale(${w} ${h})`} fill="#fff" stroke="#000" strokeWidth={0.02} />
+            {e.id === selectedId && <rect x={e.pos.x} y={e.pos.y} width={w} height={h} fill="none" stroke="#fff" strokeWidth={0.08} />}
           </g>
         );
       })}

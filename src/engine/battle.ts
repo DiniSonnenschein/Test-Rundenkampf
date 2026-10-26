@@ -37,7 +37,10 @@ export interface Unit {
   /** Aktionen eines Zuges; jede bietet eine Auswahl an Fähigkeiten. */
   actions: CharacterAction[];
   /** Größe in Feldern (2 = 2×2); pos ist das Feld oben links. */
+  /** Breite in Feldern (Standard 1). */
   size?: number;
+  /** Höhe in Feldern (ohne Angabe = Breite). */
+  height?: number;
   /** Ist ein Hindernis und belegt seine Felder (Standard: ja). */
   collision?: boolean;
   /** Aktuelle Werte der individuellen Ressourcen (ID → Menge, ohne dauerhafte Effekt-Veränderungen). */
@@ -82,8 +85,12 @@ export interface Shield {
 export interface MapObject {
   id: string;
   objectId: string;
+  /** Linkes oberes Feld. */
   pos: Pos;
   hidden: boolean;
+  /** Breite und Höhe in Feldern (Standard 1). */
+  w?: number;
+  h?: number;
 }
 
 export interface BattleMap {
@@ -149,14 +156,34 @@ export function gridOf(map: BattleMap): Grid {
 
 export const getUnit = (s: BattleState, id: string) => s.units.find((u) => u.id === id);
 export const lanternBearer = (s: BattleState) => s.units.find((u) => u.side === 'ally' && u.lantern);
+/** Breite × Höhe einer Vorlage bzw. Figur (Höhe ohne Angabe = Breite). */
+export const dimsOf = (x?: { size?: number; height?: number }) => {
+  const w = x?.size ?? 1;
+  return { w, h: x?.height ?? w };
+};
+
+/** Alle Felder eines Rechtecks ab dem linken oberen Feld. */
+export function rectTiles(pos: Pos, w: number, h: number): Pos[] {
+  const tiles: Pos[] = [];
+  for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) tiles.push({ x: pos.x + dx, y: pos.y + dy });
+  return tiles;
+}
+
 /** Alle Felder, die eine Figur belegt. */
 export function unitTiles(u: Unit, pos: Pos | null = u.pos): Pos[] {
   if (!pos) return [];
-  const n = u.size ?? 1;
-  const tiles: Pos[] = [];
-  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) tiles.push({ x: pos.x + dx, y: pos.y + dy });
-  return tiles;
+  const { w, h } = dimsOf(u);
+  return rectTiles(pos, w, h);
 }
+
+/** Alle Felder, die ein Objekt auf der Map belegt. */
+export const objectTiles = (o: MapObject) => rectTiles(o.pos, o.w ?? 1, o.h ?? 1);
+
+/** Ein Objekt für die Map (Abmessungen aus der Vorlage). */
+export const mapObject = (look: { size?: number; height?: number } | undefined, o: Omit<MapObject, 'w' | 'h'>): MapObject => {
+  const { w, h } = dimsOf(look);
+  return w === 1 && h === 1 ? o : { ...o, w, h };
+};
 
 const occupies = (u: Unit, p: Pos) => u.status !== 'entfernt' && !u.carriedBy && unitTiles(u).some((t) => samePos(t, p));
 
@@ -171,6 +198,12 @@ function lightSources(s: BattleState): LightSource[] {
 }
 
 export const facingOf = (u: Unit): Facing => u.facing ?? 'n';
+
+/** Beleuchtete Felder: Laterne(n) sowie leuchtende Objekte und Gelände (ohne das, was Allys nur sehen). */
+export function litArea(s: BattleState): Set<string> {
+  const lights = (s.map.lights ?? []).map((l) => ({ pos: l.pos, tiles: areaTiles(l.pos, l.area, 'n') }));
+  return visibleTiles(gridOf(s.map), lightSources(s), lights, s.rules.light.shape);
+}
 
 /** Aktuell sichtbare Felder: Licht + was wache Allys sehen (alle Allys teilen ihre Sicht). */
 export function visible(s: BattleState): Set<string> {
@@ -264,7 +297,9 @@ export function placeUnit(s: BattleState, id: string, pos: Pos): BattleState {
   if (!unitTiles(unit, pos).every((t) => area.some((a) => samePos(a, t)))) throw new RuleError('Nur im Lichtkegel platzierbar.');
   const other = unitAt(s, pos);
   if (other && other.id !== id && unit.collision !== false && other.collision !== false && other.pos && samePos(other.pos, pos)) {
-    if (other.side !== 'ally' || other.lantern || (other.size ?? 1) !== (unit.size ?? 1)) throw new RuleError('Das Feld ist belegt.');
+    const a = dimsOf(other);
+    const b = dimsOf(unit);
+    if (other.side !== 'ally' || other.lantern || a.w !== b.w || a.h !== b.h) throw new RuleError('Das Feld ist belegt.');
     if (!unit.pos) throw new RuleError('Das Feld ist belegt.');
     s = updateUnit(s, other.id, { pos: unit.pos });
     return updateUnit(s, id, { pos });

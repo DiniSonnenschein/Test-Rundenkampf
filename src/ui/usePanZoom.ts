@@ -45,10 +45,10 @@ export function usePanZoom(container: RefObject<HTMLDivElement | null>, mapSize:
   const toScreen = (p: { x: number; y: number }) => ({ x: (p.x - v.x) * v.s, y: (p.y - v.y) * v.s });
 
   /** Ansicht auf ein Feld zentrieren (Zoom bleibt). */
-  function centerOn(p: Pos, span = 1) {
+  function centerOn(p: Pos, span = 1, spanY = span) {
     setView((cur) => {
       const c = cur ?? v;
-      return { ...c, x: p.x + span / 2 - size.w / c.s / 2, y: p.y + span / 2 - size.h / c.s / 2 };
+      return { ...c, x: p.x + span / 2 - size.w / c.s / 2, y: p.y + spanY / 2 - size.h / c.s / 2 };
     });
   }
 

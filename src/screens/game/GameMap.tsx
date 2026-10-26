@@ -1,5 +1,5 @@
 // Spielfeld im Spielmodus: Gelände, Nebel, Objekte, Figuren, Effekt-Kreise und Hervorhebungen.
-import { unitTiles, type BattleState } from '../../engine/battle';
+import { dimsOf, objectTiles, unitTiles, type BattleState } from '../../engine/battle';
 import type { Defs } from '../../engine/defs';
 import { posKey, type Pos } from '../../engine/grid';
 import { checker } from '../../engine/level';
@@ -25,7 +25,7 @@ export interface Highlights {
 }
 
 export function GameMap({
-  battle: b, defs, levelId, seen, viewBox, h,
+  battle: b, defs, levelId, seen, viewBox, h: hl,
 }: {
   battle: BattleState;
   defs: Defs;
@@ -68,10 +68,10 @@ export function GameMap({
   }
 
   const revealed = new Set(b.revealed ?? []);
-  const objects = (b.objects ?? []).filter((o) => seen.has(posKey(o.pos)) && (!o.hidden || revealed.has(o.id)));
+  const objects = (b.objects ?? []).filter((o) => objectTiles(o).some((t) => seen.has(posKey(t))) && (!o.hidden || revealed.has(o.id)));
   // Allys sind immer sichtbar, Gegner nur auf gesehenen Feldern.
   const units = b.units.filter(
-    (u) => u.pos && u.status !== 'entfernt' && !u.carriedBy && !h.hiddenIds?.has(u.id) && (u.side === 'ally' || unitTiles(u).some((t) => seen.has(posKey(t)))),
+    (u) => u.pos && u.status !== 'entfernt' && !u.carriedBy && !hl.hiddenIds?.has(u.id) && (u.side === 'ally' || unitTiles(u).some((t) => seen.has(posKey(t)))),
   );
   // Verwandelte Figuren zeigen Form und Farbe der Vorlage, in die sie verwandelt sind.
   const look = (u: (typeof units)[number]) => {
@@ -86,37 +86,40 @@ export function GameMap({
   return (
     <svg className="map-svg" viewBox={viewBox} style={{ background: level.colors.background }}>
       {tiles}
-      {h.range?.map((p) => rect(p, 'hl-range'))}
+      {hl.range?.map((p) => rect(p, 'hl-range'))}
       {objects.map((o) => {
         const d = defs.objects[o.objectId];
-        return <ShapeInSvg key={o.id} shape={d?.shape ?? 'kreis'} color={d?.color ?? '#888'} x={o.pos.x + 0.12} y={o.pos.y + 0.12} size={0.76} />;
+        const w = o.w ?? 1;
+        const h = o.h ?? 1;
+        return <ShapeInSvg key={o.id} shape={d?.shape ?? 'kreis'} color={d?.color ?? '#888'} x={o.pos.x + 0.12} y={o.pos.y + 0.12} size={w - 0.24} height={h - 0.24} />;
       })}
-      {h.path && h.path.length > 0 && (
-        <polyline className="hl-path" points={h.path.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(' ')} />
+      {hl.path && hl.path.length > 0 && (
+        <polyline className="hl-path" points={hl.path.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(' ')} />
       )}
       {units.map((u) => {
         const d = look(u);
-        const n = u.size ?? 1;
+        const { w, h } = dimsOf(u);
+        const n = Math.min(w, h);
         const carries = b.units.some((x) => x.carriedBy === u.id && x.status !== 'entfernt');
         const p = u.pos!;
         const rings = (u.effects ?? []).map((e) => defs.effects[e.effectId]).filter((e) => e?.display.show);
         const down = u.status === 'bewusstlos';
         return (
           <g key={u.id} opacity={down ? 0.55 : 1}>
-            {u.id === h.activeId && <rect className="hl-active" x={p.x} y={p.y} width={n} height={n} rx={0.12} />}
+            {u.id === hl.activeId && <rect className="hl-active" x={p.x} y={p.y} width={w} height={h} rx={0.12} />}
             {rings.map((e, i) => (
-              <circle key={i} cx={p.x + n / 2} cy={p.y + n / 2} r={n * 0.47 - i * 0.06} fill="none" stroke={e!.display.color} strokeWidth={0.05} />
+              <ellipse key={i} cx={p.x + w / 2} cy={p.y + h / 2} rx={w * 0.47 - i * 0.06} ry={h * 0.47 - i * 0.06} fill="none" stroke={e!.display.color} strokeWidth={0.05} />
             ))}
-            <ShapeInSvg shape={d.shape} color={d.color} x={p.x + 0.12 * n} y={p.y + 0.12 * n} size={0.76 * n} />
-            {carries && <circle cx={p.x + 0.18} cy={p.y + n - 0.18} r={0.13} fill="#e8a33d" stroke="#000" strokeWidth={0.03} />}
-            <polygon points={ARROW[u.facing ?? 'n']} transform={`translate(${p.x} ${p.y}) scale(${n})`} fill={u.side === 'ally' ? '#fff' : '#ffb4a0'} stroke="#000" strokeWidth={0.02} />
-            {u.lantern && <ShapeInSvg shape="laterne" color="#f2c94c" x={p.x + n - 0.38} y={p.y - 0.02} size={0.36} />}
-            {u.id === h.selectedId && <rect className="hl-selected" x={p.x} y={p.y} width={n} height={n} rx={0.12} />}
+            <ShapeInSvg shape={d.shape} color={d.color} x={p.x + 0.12 * n} y={p.y + 0.12 * n} size={w - 0.24 * n} height={h - 0.24 * n} />
+            {carries && <circle cx={p.x + 0.18} cy={p.y + h - 0.18} r={0.13} fill="#e8a33d" stroke="#000" strokeWidth={0.03} />}
+            <polygon points={ARROW[u.facing ?? 'n']} transform={`translate(${p.x} ${p.y}) scale(${w} ${h})`} fill={u.side === 'ally' ? '#fff' : '#ffb4a0'} stroke="#000" strokeWidth={0.02} />
+            {u.lantern && <ShapeInSvg shape="laterne" color="#f2c94c" x={p.x + w - 0.38} y={p.y - 0.02} size={0.36} />}
+            {u.id === hl.selectedId && <rect className="hl-selected" x={p.x} y={p.y} width={w} height={h} rx={0.12} />}
           </g>
         );
       })}
-      {h.legal?.map((p) => rect(p, 'hl-legal'))}
-      {h.chosen?.map((p) => rect(p, 'hl-chosen'))}
+      {hl.legal?.map((p) => rect(p, 'hl-legal'))}
+      {hl.chosen?.map((p) => rect(p, 'hl-chosen'))}
     </svg>
   );
 }

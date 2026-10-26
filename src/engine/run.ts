@@ -1,7 +1,7 @@
 // Ein laufendes Spiel (Run): Team, globale Ressourcen, aktuelles Level, Verlauf zum Rückgängigmachen.
 // Alles ist reines JSON und wird als Spielstand gespeichert.
 import {
-  checkOutcome, createBattle, currentUnit, useAction, endTurn, getUnit, placementSnapshot, startBattle, type BattleMap, type BattleState, type MapObject,
+  checkOutcome, createBattle, currentUnit, mapObject, objectTiles, useAction, endTurn, getUnit, placementSnapshot, startBattle, type BattleMap, type BattleState, type MapObject,
   type Placement, type Unit,
 } from './battle';
 import { normalizeCharacter } from './characters';
@@ -93,10 +93,12 @@ export function compileMap(defs: Defs, levelId: string, objects: MapObject[], te
   for (const o of objects) {
     const d = defs.objects[o.objectId];
     if (!d) continue;
-    const k = posKey(o.pos);
-    if (d.collision) blocked.push(k);
-    if (d.castsShadow) opaque.push(k);
-    if (d.light.on) lights.push({ pos: o.pos, area: d.light.area });
+    for (const t of objectTiles(o)) {
+      const k = posKey(t);
+      if (d.collision) blocked.push(k);
+      if (d.castsShadow) opaque.push(k);
+      if (d.light.on) lights.push({ pos: t, area: d.light.area });
+    }
   }
   return {
     width: l.width,
@@ -128,6 +130,7 @@ function allyUnit(defs: Defs, m: TeamState, lantern: boolean): Omit<Unit, 'side'
     templateId: m.allyId,
     actions: a.actions,
     size: a.size,
+    height: a.height,
     collision: a.collision,
     sightArea: a.sightArea,
     base: { sightArea: a.sightArea, collision: a.collision },
@@ -163,7 +166,7 @@ function setupLevel(run: RunState): RunState {
   }
   const objects: MapObject[] = l.objects
     .filter((o) => o.objectId && run.defs.objects[o.objectId])
-    .map((o) => ({ id: o.id, objectId: o.objectId!, pos: o.pos, hidden: o.hidden ?? run.defs.objects[o.objectId!].hidden }));
+    .map((o) => mapObject(run.defs.objects[o.objectId!], { id: o.id, objectId: o.objectId!, pos: o.pos, hidden: o.hidden ?? run.defs.objects[o.objectId!].hidden }));
   const enemies = l.enemies
     .filter((e) => e.enemyId && run.defs.enemies[e.enemyId])
     .map((e) => {
@@ -176,6 +179,7 @@ function setupLevel(run: RunState): RunState {
         templateId: e.enemyId!,
         actions: d.actions,
         size: d.size,
+        height: d.height,
         collision: d.collision,
         sightArea: d.sightArea,
         base: { sightArea: d.sightArea, collision: d.collision },
@@ -496,7 +500,7 @@ export function refreshTemplates(run: RunState, fresh: Defs): RunState {
         units: ctx.battle.units.map((u) => {
           const t = u.templateId ? (u.side === 'ally' ? defs.allys[u.templateId] : defs.enemies[u.templateId]) : undefined;
           if (!t) return u;
-          return { ...u, name: t.title, size: t.size, typeIds: t.typeIds, base: { sightArea: t.sightArea, collision: t.collision } };
+          return { ...u, name: t.title, size: t.size, height: t.height, typeIds: t.typeIds, base: { sightArea: t.sightArea, collision: t.collision } };
         }),
       },
     };

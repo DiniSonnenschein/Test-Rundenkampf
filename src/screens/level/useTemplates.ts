@@ -29,11 +29,11 @@ export function useLookups(): LevelLookups {
       tpl: {
         enemy: (id) => {
           const e = enemy(id);
-          return { size: tileSize(e?.size), collision: e ? normalizeCharacter(e).collision : true };
+          return { size: tileSize(e?.size), height: tileSize(e?.height ?? e?.size), collision: e ? normalizeCharacter(e).collision : true };
         },
         object: (id) => {
           const o = object(id);
-          return { collision: o ? normalizeObject(o).collision : false };
+          return { size: tileSize(o?.size), height: tileSize(o?.height ?? o?.size), collision: o ? normalizeObject(o).collision : false };
         },
       },
     };

@@ -226,3 +226,38 @@ describe('Statistik & Debug', () => {
     expect(aiIntent(toCtx(run), 'g1')).toEqual({ targetId: 'm1', abilityId: 'schlag' });
   });
 });
+
+describe('Größen & Sicht im Licht', () => {
+  it('Breite × Höhe: Figuren und Objekte belegen alle ihre Felder', async () => {
+    const { unitTiles } = await import('./battle');
+    const { canEnter, objectsAt } = await import('./execute');
+    const defs = makeDefs();
+    defs.allys.ritter = { ...defs.allys.ritter, size: 1, height: 2 };
+    defs.objects.fels = { ...defs.objects.fels, size: 2, height: 1 };
+    const run = beginCombat(createRun(game, defs));
+    const r = getUnit(run.battle, 'm1')!;
+    expect(unitTiles(r)).toHaveLength(2);
+    expect(objectsAt(run.battle, { x: 4, y: 1 })).toHaveLength(1);
+    expect(run.battle.map.blocked).toContain('4,1');
+    expect(canEnter(toCtx(run), { ...r, height: 1 }, { x: 4, y: 1 })).toBe(false);
+  });
+
+  it('Gegner im Fackellicht sieht nur das zusammenhängende Licht, nicht den Laternenbereich', async () => {
+    const { perception } = await import('./execute');
+    const defs = makeDefs();
+    defs.objects.fackel = { ...defs.objects.fels, title: 'Fackel', collision: false, light: { on: true, area: ['-1,-1', '0,-1', '1,-1', '-1,0', '0,0', '1,0', '-1,1', '0,1', '1,1'], whenCarried: true } };
+    defs.levels.l1 = { ...defs.levels.l1, objects: [{ id: 'f1', objectId: 'fackel', pos: { x: 6, y: 1 }, hidden: null }], enemies: [{ ...defs.levels.l1.enemies[0], pos: { x: 6, y: 2 } }] };
+    defs.enemies.goblin = { ...defs.enemies.goblin, sightArea: ['0,0'] };
+    const run = beginCombat(createRun(game, defs));
+    const seen = perception(toCtx(run), getUnit(run.battle, 'g1')!);
+    expect(seen.has('7,0')).toBe(true); // Fackellicht
+    expect(seen.has('1,5')).toBe(false); // Laternenlicht, durch Dunkelheit getrennt
+    // Steht die Fackel so, dass sich die Lichtbereiche berühren, sieht er auch den Laternenbereich.
+    const near = makeDefs();
+    near.objects.fackel = defs.objects.fackel;
+    near.enemies.goblin = defs.enemies.goblin;
+    near.levels.l1 = { ...near.levels.l1, objects: [{ id: 'f1', objectId: 'fackel', pos: { x: 5, y: 4 }, hidden: null }], enemies: [{ ...near.levels.l1.enemies[0], pos: { x: 5, y: 3 } }] };
+    const run2 = beginCombat(createRun(game, near));
+    expect(perception(toCtx(run2), getUnit(run2.battle, 'g1')!).has('1,5')).toBe(true);
+  });
+});

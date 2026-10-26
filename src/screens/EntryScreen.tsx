@@ -100,12 +100,13 @@ function LookFields({ entry, set }: { entry: Entry; set: (patch: Partial<Entry>)
   const shape = typeof entry.shape === 'string' ? entry.shape : DEFAULT_LOOK.shape;
   const color = typeof entry.color === 'string' ? entry.color : DEFAULT_LOOK.color;
   const size = tileSize(entry.size ?? DEFAULT_LOOK.size);
+  const height = tileSize(entry.height ?? size);
 
   return (
     <section className="card fields">
       <h2>Darstellung im Spiel</h2>
       <div className="look-preview">
-        <ShapeIcon shape={shape} color={color} size={Math.min(140, 40 + 25 * size)} />
+        <ShapeIcon shape={shape} color={color} size={Math.min(140, 40 + 25 * Math.max(size, height))} />
       </div>
 
       <span className="field-label">Form</span>
@@ -114,9 +115,16 @@ function LookFields({ entry, set }: { entry: Entry; set: (patch: Partial<Entry>)
       <span className="field-label">Farbe</span>
       <ColorWheel value={color} onChange={(c) => set({ color: c })} />
 
-      <label className="field-label" htmlFor="size">Größe</label>
-      <Stepper id="size" value={size} min={1} max={5} onChange={(v) => set({ size: v })} />
-      <p className="muted small">Größe 2 belegt 2×2 Felder (die Kollision wächst mit).</p>
+      <span className="field-label">Größe in Feldern</span>
+      <div className="size-fields">
+        <label className="muted small" htmlFor="size">Breite</label>
+        <Stepper id="size" value={size} min={1} max={4} onChange={(v) => set({ size: v, height })} />
+        <label className="muted small" htmlFor="height">Höhe</label>
+        <Stepper id="height" value={height} min={1} max={4} onChange={(v) => set({ height: v, size })} />
+      </div>
+      <p className="muted small">
+        Belegt {size}×{height} Feld{size * height === 1 ? '' : 'er'} (Breite × Höhe); Kollision, Schatten und Licht gelten für alle. Die Form dreht nicht mit der Blickrichtung.
+      </p>
     </section>
   );
 }

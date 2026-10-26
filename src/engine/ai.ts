@@ -1,6 +1,6 @@
 // Gegner-KI (und Allys mit Verhaltens-Effekt): feste Regeln, kein Zufall – gleiche Lage, gleiches Handeln.
 import type { AbilityFields } from './abilities';
-import { actionState, currentUnit, getUnit, unitTiles, useAction, visible, type Unit } from './battle';
+import { actionState, currentUnit, getUnit, litArea, unitTiles, useAction, type Unit } from './battle';
 import { DEFAULT_BEHAVIOR, rankTargets, type Behavior, type MovementMode, type RuleCondition, type RuleTarget, type TargetCriterion } from './behavior';
 import { hasBlock } from './effects';
 import { affordable, conditionsMet, executeAbility, findPath, legalOnTile, legalTargets, perceives, perception, rangeTiles } from './execute';
@@ -95,7 +95,7 @@ function idleGoal(ctx: Ctx, u: Unit, behavior: Behavior): Pos | null {
   if (behavior.idle === 'patrouille' && u.patrol?.points.length) return u.patrol.points[u.patrol.index % u.patrol.points.length];
   if (behavior.idle === 'letzte-position') return Object.values(u.lastSeen ?? {})[0] ?? null;
   if (behavior.idle === 'licht') {
-    const lit = [...visible({ ...ctx.battle, units: ctx.battle.units.filter((x) => x.lantern) })].map((k) => {
+    const lit = [...litArea(ctx.battle)].map((k) => {
       const [x, y] = k.split(',').map(Number);
       return { x, y };
     });

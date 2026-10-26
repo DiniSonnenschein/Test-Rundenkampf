@@ -1,10 +1,10 @@
 // Fähigkeiten im Kampf: Reichweite, legale Ziele, Bedingungen, Kosten und Ausführung der Bausteine.
 import { canPay, resourceCosts, traceProjectile, type AbilityBlock, type AbilityFields } from './abilities';
-import { facingOf, getUnit, onTargeted, unitTiles, visible, type BattleState, type MapObject, type Unit } from './battle';
+import { dimsOf, facingOf, getUnit, gridOf, litArea, mapObject, objectTiles, rectTiles, onTargeted, unitTiles, visible, type BattleState, type MapObject, type Unit } from './battle';
 import { titleOf } from './defs';
 import { hasBlock, type Selection } from './effects';
 import { areaTiles, facingFromStep, facingTowards, type Facing } from './facing';
-import { distance, inBounds, neighbors, posKey, samePos, type Grid, type Pos } from './grid';
+import { distance, hasLineOfSight, inBounds, neighbors, posKey, samePos, type Grid, type Pos } from './grid';
 import { slotsNeeded } from './objects';
 import { totalAdjustment } from './resources';
 import {
@@ -20,7 +20,7 @@ export const isVoidTile = (b: BattleState, p: Pos) => !inBounds(b.map, p) || (b.
 
 export const unitsAt = (b: BattleState, p: Pos) =>
   b.units.filter((u) => u.status !== 'entfernt' && !u.carriedBy && unitTiles(u).some((t) => samePos(t, p)));
-export const objectsAt = (b: BattleState, p: Pos) => (b.objects ?? []).filter((o) => samePos(o.pos, p));
+export const objectsAt = (b: BattleState, p: Pos) => (b.objects ?? []).filter((o) => objectTiles(o).some((t) => samePos(t, p)));
 export const terrainOf = (ctx: Ctx, p: Pos) => {
   const id = ctx.battle.terrain?.[posKey(p)];
   return id ? ctx.defs.terrains[id] : undefined;
@@ -86,17 +86,47 @@ export function legalOnTile(ctx: Ctx, caster: Unit, a: AbilityFields, p: Pos, on
 
 const hasAnything = (r: ReturnType<typeof legalOnTile>) => r.units.length > 0 || r.objects.length > 0 || r.tile;
 
-/** Was ein Charakter sieht: Allys teilen ihre Sicht; Gegner sehen ihr Sichtfeld und – im Licht – alles Beleuchtete. */
+/**
+ * Was ein Charakter sieht: Allys teilen ihre Sicht. Gegner sehen ihr Sichtfeld und – wenn sie im Licht stehen –
+ * die beleuchteten Felder, die ohne Nebel dazwischen mit ihrem Licht zusammenhängen (diagonal nur, wenn diagonale
+ * Bewegung erlaubt ist) und zu denen sie freie Sicht haben.
+ */
 export function perception(ctx: Ctx, viewer: Unit): Set<string> {
   if (viewer.side === 'ally') return visible(ctx.battle);
-  const all = visible({ ...ctx.battle, units: ctx.battle.units.filter((u) => u.side === 'ally' && u.lantern) });
+  const b = ctx.battle;
+  const lit = litArea(b);
   const own = new Set<string>();
-  for (const t of unitTiles(viewer)) {
+  const from = unitTiles(viewer);
+  for (const t of from) {
     own.add(posKey(t));
     for (const p of areaTiles(t, viewer.sightArea ?? [], facingOf(viewer))) own.add(posKey(p));
   }
-  const inLight = unitTiles(viewer).some((t) => all.has(posKey(t)));
-  return inLight ? new Set([...own, ...all]) : own;
+  const start = from.filter((t) => lit.has(posKey(t)));
+  if (!start.length) return own;
+  // Zusammenhängendes Licht um den Gegner.
+  const steps = b.rules.diagonal
+    ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+    : [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const region = new Set(start.map(posKey));
+  const queue = [...start];
+  while (queue.length) {
+    const p = queue.shift()!;
+    for (const [dx, dy] of steps) {
+      const q = { x: p.x + dx, y: p.y + dy };
+      const k = posKey(q);
+      if (!region.has(k) && lit.has(k)) {
+        region.add(k);
+        queue.push(q);
+      }
+    }
+  }
+  // Davon nur, was er auch sehen kann (Wände und Schatten werfende Objekte blockieren).
+  const g = gridOf(b.map);
+  for (const k of region) {
+    const [x, y] = k.split(',').map(Number);
+    if (from.some((t) => hasLineOfSight(g, t, { x, y }))) own.add(k);
+  }
+  return own;
 }
 
 /** Felder, die als Ziel gewählt werden dürfen (nur wahrgenommene). */
@@ -368,15 +398,18 @@ export function matchingItems(ctx: Ctx, u: Unit, sel: Selection): string[] {
 /** Ein Objekt auf die Map legen (Kollision: nur, wenn frei – sonst daneben auf ein freies Feld). */
 function dropObject(ctx: Ctx, objectId: string, at: Pos): Ctx {
   const d = ctx.defs.objects[objectId];
-  const free = (p: Pos) =>
+  const { w, h } = dimsOf(d);
+  const freeTile = (p: Pos) =>
     !isVoidTile(ctx.battle, p) &&
     (!d?.collision || (!objectsAt(ctx.battle, p).some((o) => ctx.defs.objects[o.objectId]?.collision) && !unitsAt(ctx.battle, p).some((u) => u.collision !== false)));
+  // Große Objekte brauchen alle ihre Felder frei.
+  const free = (p: Pos) => rectTiles(p, w, h).every(freeTile);
   let pos: Pos | undefined = free(at) ? at : undefined;
   for (let r = 1; !pos && r <= 3; r++) {
     for (let dy = -r; dy <= r && !pos; dy++) for (let dx = -r; dx <= r && !pos; dx++) if (free({ x: at.x + dx, y: at.y + dy })) pos = { x: at.x + dx, y: at.y + dy };
   }
   if (!pos) return log(ctx, `${titleOf(ctx.defs, objectId)} findet keinen Platz.`);
-  return { ...ctx, battle: { ...ctx.battle, objects: [...(ctx.battle.objects ?? []), { id: uid('obj'), objectId, pos, hidden: false }] } };
+  return { ...ctx, battle: { ...ctx.battle, objects: [...(ctx.battle.objects ?? []), mapObject(d, { id: uid('obj'), objectId, pos, hidden: false })] } };
 }
 
 /** Wendet einen Baustein an. caster kann auch ein Objekt bzw. Feld sein (Wirkungen). */
@@ -476,7 +509,7 @@ export function applyBlock(ctx: Ctx, caster: Unit, abilityId: string, a: Ability
       for (const u of hit.units.filter((x) => x.side === 'enemy')) ctx = replaceUnit(ctx, u.id, b.into.kind, b.into.id);
       for (const o of hit.objects) {
         if (b.into.kind === 'objekt') {
-          ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).map((x) => (x.id === o.id ? { ...x, objectId: b.into.id! } : x)) } };
+          ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).map((x) => (x.id === o.id ? mapObject(ctx.defs.objects[b.into.id!], { ...x, objectId: b.into.id! }) : x)) } };
         } else {
           ctx = { ...ctx, battle: { ...ctx.battle, objects: (ctx.battle.objects ?? []).filter((x) => x.id !== o.id) } };
           ctx = spawnEnemy(ctx, b.into.id!, o.pos);
@@ -579,12 +612,12 @@ export function applyBlock(ctx: Ctx, caster: Unit, abilityId: string, a: Ability
       const ids = [
         ...(b.objekte.on
           ? (ctx.battle.objects ?? [])
-              .filter((o) => tiles.has(posKey(o.pos)) && (!b.objekte.typeIds.length || (ctx.defs.objects[o.objectId]?.typeIds ?? []).some((t) => b.objekte.typeIds.includes(t))))
+              .filter((o) => objectTiles(o).some((t) => tiles.has(posKey(t))) && (!b.objekte.typeIds.length || (ctx.defs.objects[o.objectId]?.typeIds ?? []).some((t) => b.objekte.typeIds.includes(t))))
               .map((o) => o.id)
           : []),
         ...(b.gegner.on
           ? ctx.battle.units
-              .filter((u) => u.side === 'enemy' && u.pos && tiles.has(posKey(u.pos)) && (!b.gegner.typeIds.length || (u.typeIds ?? []).some((t) => b.gegner.typeIds.includes(t))))
+              .filter((u) => u.side === 'enemy' && unitTiles(u).some((t) => tiles.has(posKey(t))) && (!b.gegner.typeIds.length || (u.typeIds ?? []).some((t) => b.gegner.typeIds.includes(t))))
               .map((u) => u.id)
           : []),
         ...(b.showRange ? ['__bereiche__'] : []),
@@ -625,6 +658,7 @@ export function spawnEnemy(ctx: Ctx, enemyId: string, pos: Pos): Ctx {
     templateId: enemyId,
     actions: d.actions,
     size: d.size,
+    height: d.height,
     collision: d.collision,
     sightArea: d.sightArea,
     base: { sightArea: d.sightArea, collision: d.collision },

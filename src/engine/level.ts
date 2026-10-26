@@ -166,16 +166,18 @@ export function toggleVictory(l: LevelFields, p: Pos): LevelFields {
 
 /** Infos über Vorlagen: Größe und Kollision. */
 export interface Templates {
-  enemy: (id: string | null) => { size: number; collision: boolean };
-  object: (id: string | null) => { collision: boolean };
+  enemy: (id: string | null) => { size: number; height?: number; collision: boolean };
+  object: (id: string | null) => { size?: number; height?: number; collision: boolean };
 }
 
 export type Thing = { kind: 'gegner'; item: PlacedEnemy } | { kind: 'objekt'; item: PlacedObject };
 
 function tilesOf(t: Thing, tpl: Templates, pos: Pos = t.item.pos): Pos[] {
-  const n = t.kind === 'gegner' ? tpl.enemy(t.item.enemyId).size : 1;
+  const d = t.kind === 'gegner' ? tpl.enemy(t.item.enemyId) : tpl.object(t.item.objectId);
+  const w = d.size ?? 1;
+  const h = d.height ?? w;
   const tiles: Pos[] = [];
-  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) tiles.push({ x: pos.x + dx, y: pos.y + dy });
+  for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) tiles.push({ x: pos.x + dx, y: pos.y + dy });
   return tiles;
 }
 

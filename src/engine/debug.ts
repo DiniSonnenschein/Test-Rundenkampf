@@ -1,6 +1,6 @@
 // Debug-Menü: Eingriffe während des Spiels zum Austesten. Alles wird im Protokoll mit 🛠 markiert
 // und zählt nicht in der Statistik (kein Verursacher).
-import { getUnit, removeUnit } from './battle';
+import { getUnit, mapObject, removeUnit } from './battle';
 import { titleOf } from './defs';
 import { objectsAt, spawnEnemy } from './execute';
 import type { Pos } from './grid';
@@ -52,7 +52,7 @@ export function debugAddEnemy(run: RunState, enemyId: string, at: Pos): RunState
 
 export function debugAddObject(run: RunState, objectId: string, at: Pos): RunState {
   return apply(run, (ctx) => {
-    const o = { id: `debug-${Date.now().toString(36)}-${seq++}`, objectId, pos: at, hidden: false };
+    const o = mapObject(ctx.defs.objects[objectId], { id: `debug-${Date.now().toString(36)}-${seq++}`, objectId, pos: at, hidden: false });
     return mark({ ...ctx, battle: { ...ctx.battle, objects: [...(ctx.battle.objects ?? []), o] } }, `${titleOf(ctx.defs, objectId)} hinzugefügt`);
   });
 }
