@@ -1,7 +1,13 @@
-import { normalizeRules, type LightShape, type Rules, type TieBreak, type TurnWhenTargeted } from '../../engine/rules';
+import { normalizeRules, type LightShape, type ResourceCarry, type Rules, type TieBreak, type TurnWhenTargeted } from '../../engine/rules';
 import { TypePicker } from '../../ui/pickers';
 import { Select } from './shared';
-import { Choice, Stepper, Toggle } from '../../ui/fields';
+import { Choice, RefSelect, Stepper, Toggle } from '../../ui/fields';
+
+const CARRY: { value: ResourceCarry; label: string }[] = [
+  { value: 'behalten', label: 'Behalten' },
+  { value: 'start', label: 'Startwert' },
+  { value: 'max', label: 'Auffüllen' },
+];
 import type { EditorProps } from './index';
 import { LightPreview } from './LightPreview';
 
@@ -75,6 +81,51 @@ export function RulesEditor({ entry, set }: EditorProps) {
           checked={rules.effectsPersistAcrossLevels}
           onChange={(v) => update((r) => ({ ...r, effectsPersistAcrossLevels: v }))}
         />
+      </section>
+
+      <section className="card fields">
+        <h2>Ressourcen beim Levelwechsel</h2>
+        <p className="muted small">
+          Was mit den Ressourcen der Allys passiert, wenn ein Level geschafft ist: behalten, auf den Startwert setzen oder bis zum Maximum
+          auffüllen (ohne Maximum: behalten). Globale Ressourcen bleiben immer. Zusätzliche Ereignisse lassen sich im Spiel-Editor einfügen.
+        </p>
+        <span className="field-label">Grundregel</span>
+        <Choice<ResourceCarry>
+          value={rules.betweenLevels.resources}
+          options={CARRY}
+          onChange={(v) => update((r) => ({ ...r, betweenLevels: { ...r.betweenLevels, resources: v } }))}
+        />
+        <span className="field-label">Ausnahmen</span>
+        {rules.betweenLevels.overrides.map((o, i) => {
+          const setO = (n: typeof o) => update((r) => ({ ...r, betweenLevels: { ...r.betweenLevels, overrides: r.betweenLevels.overrides.map((x, j) => (j === i ? n : x)) } }));
+          return (
+            <div key={i} className="sub-card">
+              <div className="ability-row">
+                <RefSelect
+                  collection="ressourcen"
+                  value={o.resourceId}
+                  emptyLabel="– Ressource –"
+                  filter={(e) => (e as { scope?: string }).scope !== 'global'}
+                  onChange={(resourceId) => setO({ ...o, resourceId })}
+                />
+                <button
+                  className="icon-btn"
+                  aria-label="Entfernen"
+                  onClick={() => update((r) => ({ ...r, betweenLevels: { ...r.betweenLevels, overrides: r.betweenLevels.overrides.filter((_, j) => j !== i) } }))}
+                >
+                  ✕
+                </button>
+              </div>
+              <Choice<ResourceCarry> value={o.mode} options={CARRY} onChange={(mode) => setO({ ...o, mode })} />
+            </div>
+          );
+        })}
+        <button
+          className="btn btn-small"
+          onClick={() => update((r) => ({ ...r, betweenLevels: { ...r.betweenLevels, overrides: [...r.betweenLevels.overrides, { resourceId: null, mode: 'max' }] } }))}
+        >
+          + Ausnahme
+        </button>
       </section>
 
       <section className="card fields">

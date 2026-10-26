@@ -19,7 +19,8 @@ const INTERLUDE: { kind: InterludeBlock['kind']; label: string; create: () => In
   { kind: 'belohnung', label: 'Belohnung', create: () => ({ kind: 'belohnung', items: [], choose: { on: false, count: 1 } }) },
   { kind: 'effekte', label: 'Effekte vergeben/beenden', create: () => ({ kind: 'effekte', action: 'vergeben', effectId: null, typeIds: [], duration: { kind: 'bis-aufloesung' } }) },
   { kind: 'rucksack', label: 'Rucksäcke ordnen & tauschen', create: () => ({ kind: 'rucksack' }) },
-  { kind: 'haendler', label: 'Händler', create: () => ({ kind: 'haendler', currencyId: null, typePrices: [], objectPrices: [], offers: [] }) },
+  { kind: 'haendler', label: 'Händler', create: () => ({ kind: 'haendler', currencyId: null, typePrices: [], objectPrices: [], offers: [], selling: true }) },
+  { kind: 'text', label: 'Ereignis mit Text', create: () => ({ kind: 'text', title: '', text: '' }) },
 ];
 
 /** Liste mit Zeilen, „+“ und ✕ (kompakt). */
@@ -164,7 +165,17 @@ function InterludeFields({ b, set }: { b: InterludeBlock; set: (b: InterludeBloc
               </>
             )}
           />
-          <p className="muted small">Verkaufen kann man alles, wofür der Händler einen Preis hat.</p>
+          <Toggle label="Kauft auch an (Allys können verkaufen)" checked={b.selling} onChange={(selling) => set({ ...b, selling })} />
+          {b.selling && <p className="muted small">Verkaufen kann man alles, wofür der Händler einen Preis hat.</p>}
+        </>
+      );
+    case 'text':
+      return (
+        <>
+          <label className="field-label">Überschrift</label>
+          <input className="input" value={b.title} onChange={(e) => set({ ...b, title: e.target.value })} />
+          <label className="field-label">Text</label>
+          <textarea className="input" rows={4} value={b.text} onChange={(e) => set({ ...b, text: e.target.value })} />
         </>
       );
   }

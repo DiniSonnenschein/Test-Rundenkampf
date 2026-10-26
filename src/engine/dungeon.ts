@@ -23,7 +23,11 @@ export type InterludeBlock =
       objectPrices: ({ objectId: string | null } & Price)[];
       /** Angebot; stock null = unbegrenzt. */
       offers: { objectId: string | null; stock: number | null }[];
-    };
+      /** Der Händler kauft auch an (alles, wofür er einen Preis hat). */
+      selling: boolean;
+    }
+  /** Ereignis mit Text (nur zum Lesen). */
+  | { kind: 'text'; title: string; text: string };
 
 export interface DungeonStation {
   id: string;
@@ -44,7 +48,8 @@ export function normalizeDungeon(partial: unknown): DungeonFields {
   const stations = p.stations ?? [];
   const ids = new Set(stations.map((s) => s.id));
   // Verweise auf gelöschte Stationen fallen weg.
-  return { stations: stations.map((s) => ({ ...s, next: s.next.filter((n) => ids.has(n)), interlude: s.interlude ?? [] })) };
+  const block = (b: InterludeBlock): InterludeBlock => (b.kind === 'haendler' ? { ...b, selling: b.selling ?? true } : b);
+  return { stations: stations.map((s) => ({ ...s, next: s.next.filter((n) => ids.has(n)), interlude: (s.interlude ?? []).map(block) })) };
 }
 
 export const startStation = (d: DungeonFields) => d.stations[0] ?? null;

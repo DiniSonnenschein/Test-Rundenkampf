@@ -11,7 +11,7 @@ import { navigate, routes } from '../../router';
 import { formatDate } from '../../ui/format';
 import { normalizeCharacter } from '../../engine/characters';
 import { normalizeDungeon } from '../../engine/dungeon';
-import { memberItems, memberResources, normalizeGame, validateGame, type GameContent, type GameFields, type TeamMember } from '../../engine/game';
+import { contentLevels, memberItems, memberResources, normalizeGame, validateGame, type GameContent, type GameFields, type LevelEvent, type TeamMember } from '../../engine/game';
 import { normalizeLevel } from '../../engine/level';
 import { normalizeResource } from '../../engine/resources';
 import { useDialog } from '../../ui/Dialog';
@@ -19,7 +19,7 @@ import { Choice, RefSelect, Stepper } from '../../ui/fields';
 import { ShapeIcon } from '../../ui/shapes';
 import type { EditorProps } from './index';
 
-function MemberCard({
+export function MemberCard({
   m, index, count, isLantern, set, onLantern, onMove, onRemove,
 }: {
   m: TeamMember;
@@ -98,6 +98,41 @@ function MemberCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function LevelEventCard({ e, levelIds, levelName, set, onRemove }: {
+  e: LevelEvent;
+  levelIds: string[];
+  levelName: (id: string) => string;
+  set: (e: LevelEvent) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="sub-card">
+      <div className="ability-row">
+        <RefSelect collection="ressourcen" value={e.resourceId} emptyLabel="– Ressource –" onChange={(resourceId) => set({ ...e, resourceId })} />
+        <button className="icon-btn" aria-label="Entfernen" onClick={onRemove}>✕</button>
+      </div>
+      <Choice<LevelEvent['mode']>
+        value={e.mode}
+        options={[{ value: 'max', label: 'Auffüllen' }, { value: 'start', label: 'Startwert' }, { value: 'betrag', label: 'Betrag' }]}
+        onChange={(mode) => set({ ...e, mode })}
+      />
+      {e.mode === 'betrag' && <Stepper value={e.amount} signed onChange={(amount) => set({ ...e, amount })} />}
+      <span className="field-label">Wann</span>
+      <select
+        className="input"
+        value={e.after === 'jedem-level' ? '' : e.levelId ?? ''}
+        onChange={(ev) => set(ev.target.value ? { ...e, after: 'level', levelId: ev.target.value } : { ...e, after: 'jedem-level', levelId: null })}
+      >
+        <option value="">Nach jedem Level</option>
+        {levelIds.map((id) => (
+          <option key={id} value={id}>Nach „{levelName(id)}“</option>
+        ))}
+        {e.levelId && !levelIds.includes(e.levelId) && <option value={e.levelId}>Nach „{levelName(e.levelId)}“ (nicht im Inhalt)</option>}
+      </select>
     </div>
   );
 }
@@ -215,6 +250,30 @@ export function GameEditor({ entry, set }: EditorProps) {
           />
         ))}
         <button className="btn" onClick={addMember}>+ Ally</button>
+      </section>
+
+      <section className="card fields">
+        <h2>Ereignisse zwischen Leveln</h2>
+        <p className="muted small">
+          Nach einem geschafften Level (vor der Zwischenstation): eine Ressource auffüllen, auf den Startwert setzen oder um einen Betrag ändern.
+          Individuelle Ressourcen gelten für alle Allys, globale für den Pool. Die Grundregel steht im Regelwerk.
+        </p>
+        {g.levelEvents.map((e, i) => (
+          <LevelEventCard
+            key={i}
+            e={e}
+            levelIds={[...new Set(contentLevels(c, (id) => normalizeDungeon(dungeons.find((d) => d.id === id) ?? {}).stations.map((s) => s.levelId)).filter((x): x is string => !!x))]}
+            levelName={(id) => levels.find((l) => l.id === id)?.title ?? '?'}
+            set={(n) => update({ levelEvents: g.levelEvents.map((x, j) => (j === i ? n : x)) })}
+            onRemove={() => update({ levelEvents: g.levelEvents.filter((_, j) => j !== i) })}
+          />
+        ))}
+        <button
+          className="btn btn-small"
+          onClick={() => update({ levelEvents: [...g.levelEvents, { after: 'jedem-level', levelId: null, resourceId: null, mode: 'max', amount: 5 }] })}
+        >
+          + Ereignis
+        </button>
       </section>
 
       {globals.length > 0 && (

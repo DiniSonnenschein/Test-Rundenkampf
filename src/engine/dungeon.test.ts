@@ -30,6 +30,7 @@ describe('Dungeon', () => {
       typePrices: [{ typeId: 'trank', buy: 5, sell: 2 }],
       objectPrices: [{ objectId: 'elixier', buy: 20, sell: 10 }],
       offers: [],
+      selling: true,
     };
     expect(priceFor(m, 'heiltrank', ['trank'])).toEqual({ buy: 5, sell: 2 });
     expect(priceFor(m, 'elixier', ['trank'])).toEqual({ buy: 20, sell: 10 });

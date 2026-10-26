@@ -8,6 +8,9 @@ export type TieBreak = 'allys-zuerst' | 'gegner-zuerst' | 'abwechselnd';
 /** Wann sich Charaktere außerhalb ihres Zuges zur Quelle einer Fähigkeit/eines Effekts drehen. */
 export type TurnWhenTargeted = 'nie' | 'gegnerisch' | 'alle' | 'typen';
 
+/** Was mit individuellen Ressourcen der Allys beim Levelwechsel passiert. */
+export type ResourceCarry = 'behalten' | 'start' | 'max';
+
 export interface Rules {
   /** Diagonale Bewegung erlaubt. */
   diagonal: boolean;
@@ -28,6 +31,11 @@ export interface Rules {
   turnsPerRound: number;
   /** Effekte laufen beim Levelwechsel weiter (sonst enden alle). */
   effectsPersistAcrossLevels: boolean;
+  /** Ressourcen beim Levelwechsel: Grundregel und Ausnahmen je Ressource. */
+  betweenLevels: {
+    resources: ResourceCarry;
+    overrides: { resourceId: string | null; mode: ResourceCarry }[];
+  };
   facing: {
     turnWhenTargeted: TurnWhenTargeted;
     /** Typen (Fähigkeiten & Effekte) für 'typen'. */
@@ -48,6 +56,7 @@ export const DEFAULT_RULES: Rules = {
   initiative: { tieBreak: 'allys-zuerst' },
   turnsPerRound: 1,
   effectsPersistAcrossLevels: true,
+  betweenLevels: { resources: 'behalten', overrides: [] },
   facing: { turnWhenTargeted: 'nie', typeIds: [] },
   defeat: { unconsciousTurns: 2, unconsciousCount: 'alle' },
 };
@@ -69,6 +78,10 @@ export function normalizeRules(partial: unknown): Rules {
     },
     turnsPerRound: p.turnsPerRound ?? d.turnsPerRound,
     effectsPersistAcrossLevels: p.effectsPersistAcrossLevels ?? d.effectsPersistAcrossLevels,
+    betweenLevels: {
+      resources: p.betweenLevels?.resources ?? d.betweenLevels.resources,
+      overrides: p.betweenLevels?.overrides ?? [],
+    },
     facing: {
       turnWhenTargeted: p.facing?.turnWhenTargeted ?? d.facing.turnWhenTargeted,
       typeIds: p.facing?.typeIds ?? [],

@@ -17,6 +17,17 @@ export interface TeamMember {
   resources: Record<string, { start?: number; max?: number }>;
 }
 
+/** Ereignis zwischen Leveln: füllt eine Ressource wieder auf (individuell: alle Allys; global: der Pool). */
+export interface LevelEvent {
+  /** Nach jedem Level oder nur nach einem bestimmten. */
+  after: 'jedem-level' | 'level';
+  levelId: string | null;
+  resourceId: string | null;
+  /** Auf das Maximum, auf den Startwert oder um einen Betrag. */
+  mode: 'max' | 'start' | 'betrag';
+  amount: number;
+}
+
 export interface GameFields {
   regelwerkId: string | null;
   content: GameContent;
@@ -25,6 +36,7 @@ export interface GameFields {
   lanternMemberId: string | null;
   /** Abweichende Startwerte globaler Ressourcen. */
   globalStarts: Record<string, number>;
+  levelEvents: LevelEvent[];
 }
 
 export const DEFAULT_GAME: GameFields = {
@@ -33,6 +45,7 @@ export const DEFAULT_GAME: GameFields = {
   team: [],
   lanternMemberId: null,
   globalStarts: {},
+  levelEvents: [],
 };
 
 export function normalizeGame(partial: unknown): GameFields {
@@ -44,6 +57,7 @@ export function normalizeGame(partial: unknown): GameFields {
     team,
     lanternMemberId: team.some((m) => m.id === p.lanternMemberId) ? p.lanternMemberId! : null,
     globalStarts: p.globalStarts ?? {},
+    levelEvents: p.levelEvents ?? [],
   };
 }
 

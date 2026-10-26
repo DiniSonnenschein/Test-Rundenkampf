@@ -16,6 +16,7 @@ import { useDialog } from '../../ui/Dialog';
 import { Header } from '../../ui/Header';
 import { usePanZoom } from '../../ui/usePanZoom';
 import { GameMap } from './GameMap';
+import { InterludeView } from './InterludeView';
 
 type Ui =
   | { kind: 'aktionen' }
@@ -142,8 +143,11 @@ export function GameScreen({ id }: { id: string }) {
     );
   }
 
+  if (run.interlude) return <InterludeView run={run} setRun={setRun} />;
+
   const r = run;
   const defs = r.defs;
+  const hasInterlude = !!defs.dungeon?.stations.find((s) => s.id === r.stationId)?.interlude.length;
   const name = (u: Unit) => u.name;
 
   // ---------- Aktionen ----------
@@ -463,7 +467,9 @@ export function GameScreen({ id }: { id: string }) {
             {r.result === 'level-gewonnen' && (
               <>
                 <h2>Level geschafft!</h2>
-                {r.choices && r.choices.length > 1 ? (
+                {hasInterlude ? (
+                  <button className="btn btn-primary" onClick={() => setRun(nextLevel(r))}>Weiter zur Zwischenstation</button>
+                ) : r.choices && r.choices.length > 1 ? (
                   <>
                     <p className="muted">Wie geht es weiter?</p>
                     {r.choices.map((sid) => (

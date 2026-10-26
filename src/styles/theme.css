@@ -454,3 +454,13 @@ p { margin: 0 0 1em; line-height: 1.5; }
   padding: 16px var(--gap) calc(env(safe-area-inset-bottom) + 16px); background: var(--surface); border-radius: 18px 18px 0 0;
 }
 .game-log-inner ol { margin: 0; padding-left: 1.2em; overflow-y: auto; font-size: .85rem; line-height: 1.45; }
+
+/* Zwischenstation */
+.interlude .card { margin-bottom: 12px; }
+.interlude-globals { margin: 0 0 12px; }
+.trade-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.trade-row:last-child { border-bottom: none; }
+.trade-row > span:first-child { flex: 1; min-width: 0; }
+.btn-group { display: flex; gap: 6px; align-items: center; }
+.pre-line { white-space: pre-line; }
+.trade-row .btn { width: auto; flex: none; }

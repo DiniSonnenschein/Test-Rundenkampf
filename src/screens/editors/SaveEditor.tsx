@@ -8,7 +8,7 @@ export function SaveEditor({ entry }: EditorProps) {
   const run = entry.run as RunState | undefined;
   if (!run) return <section className="card muted">Dieser Spielstand enthält kein Spiel.</section>;
   const b = run.battle;
-  const status = run.result === 'run-gewonnen' ? 'Gewonnen' : run.result === 'run-verloren' ? 'Verloren' : b.phase === 'platzierung' ? 'Platzierung' : `Runde ${b.round}`;
+  const status = run.interlude ? 'Zwischenstation' : run.result === 'run-gewonnen' ? 'Gewonnen' : run.result === 'run-verloren' ? 'Verloren' : b.phase === 'platzierung' ? 'Platzierung' : `Runde ${b.round}`;
   return (
     <section className="card fields">
       <h2>Spielstand</h2>

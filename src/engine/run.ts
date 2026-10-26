@@ -8,7 +8,8 @@ import { normalizeCharacter } from './characters';
 import type { Defs } from './defs';
 import { startStation } from './dungeon';
 import type { ActiveEffect, TickEvent } from './effects';
-import { memberItems, memberResources, type GameContent, type GameFields } from './game';
+import { memberItems, memberResources, type GameContent, type GameFields, type LevelEvent } from './game';
+import { applyLevelEvents, carryResources, enterInterlude, type InterludeState, type Member } from './interlude';
 import { posKey } from './grid';
 import { isVictory, terrainAt } from './level';
 import { INITIATIVE_ID } from './resources';
@@ -19,14 +20,7 @@ import { executeAbility, type ExecOptions } from './execute';
 import type { Pos } from './grid';
 import { aiControlled, areaPass, levelStartTriggers, markReactionUsed, processEvents, turnWorkings } from './triggers';
 
-export interface TeamState {
-  memberId: string;
-  allyId: string;
-  values: Record<string, number>;
-  maxValues: Record<string, number | null>;
-  items: { objectId: string; count: number }[];
-  effects: ActiveEffect[];
-}
+export type TeamState = Member;
 
 /** Verlauf: Zustand zu Beginn jedes Ally-Zuges (bzw. der Platzierung). */
 export interface Snapshot {
@@ -61,6 +55,12 @@ export interface RunState {
   pending?: PendingReaction[];
   /** „Startet damit ins Spiel“ wurde bereits ausgelöst. */
   gameStarted?: boolean;
+  /** Ereignisse zwischen Leveln (aus dem Spiel-Editor). */
+  levelEvents?: LevelEvent[];
+  /** Startwerte der globalen Ressourcen in diesem Spiel. */
+  globalStarts?: Record<string, number>;
+  /** Zwischenstation nach einem Dungeon-Level (statt eines Kampfes). */
+  interlude?: InterludeState;
 }
 
 const MAX_HISTORY = 60;
@@ -129,6 +129,7 @@ function allyUnit(defs: Defs, m: TeamState, lantern: boolean): Omit<Unit, 'side'
     values: { ...m.values },
     maxValues: { ...m.maxValues },
     items: m.items.map((i) => ({ ...i })),
+    carried: (m.carried ?? []).map((i) => ({ ...i })),
     effects: m.effects,
     lantern: lantern ? {} : undefined,
     facing: 'n',
@@ -203,6 +204,7 @@ export function createRun(game: GameFields, defs: Defs): RunState {
         memberId: m.id,
         allyId: m.allyId!,
         values: Object.fromEntries(res.map((r) => [r.resourceId, r.start])),
+        startValues: Object.fromEntries(res.map((r) => [r.resourceId, r.start])),
         maxValues: Object.fromEntries(res.map((r) => [r.resourceId, r.hasMax ? r.max : null])),
         items: memberItems(m, ally).filter((i): i is { objectId: string; count: number } => !!i.objectId),
         effects: [],
@@ -228,6 +230,8 @@ export function createRun(game: GameFields, defs: Defs): RunState {
     battle: null as unknown as BattleState,
     log: [],
     history: [],
+    levelEvents: game.levelEvents,
+    globalStarts: globals,
   };
   // Start-Effekte der Allys.
   let r = setupLevel(run);
@@ -352,6 +356,7 @@ function carryTeam(run: RunState): TeamState[] {
       values: { ...(u.values ?? m.values) },
       maxValues: { ...(u.maxValues ?? m.maxValues) },
       items: (u.items ?? m.items).map((i) => ({ ...i })),
+      carried: (u.carried ?? []).map((i) => ({ ...i })),
       effects: run.defs.rules.effectsPersistAcrossLevels ? (u.effects ?? []) : [],
     };
   });
@@ -368,11 +373,30 @@ function finishLevel(run: RunState): RunState {
   return { ...done, result: 'level-gewonnen', choices: station.next };
 }
 
-/** Weiter ins nächste Level (bei Verzweigung mit gewählter Station). */
+/**
+ * Weiter: nach einem geschafften Level zur Zwischenstation (falls vorhanden) bzw. ins nächste Level;
+ * aus einer Zwischenstation ins nächste Level (bei Verzweigung mit gewählter Station).
+ */
 export function nextLevel(run: RunState, stationId?: string): RunState {
+  if (run.interlude) {
+    const choices = run.interlude.choices;
+    return setupLevel({ ...run, interlude: undefined, stationId: stationId ?? choices[0] ?? null });
+  }
   if (run.result !== 'level-gewonnen') return run;
-  const base: RunState = { ...run, team: carryTeam(run), placement: placementSnapshot(run.battle) };
+  // Levelwechsel: Werte übernehmen, Regelwerk (Ressourcen) und Ereignisse aus dem Spiel-Editor anwenden.
+  const party = applyLevelEvents(
+    run.defs,
+    { team: carryResources(run.defs, carryTeam(run)), globals: run.globals, log: run.log },
+    run.levelEvents ?? [],
+    run.levelId,
+    run.globalStarts ?? {},
+  );
+  const base: RunState = { ...run, ...party, placement: placementSnapshot(run.battle) };
   if (run.content.kind === 'levels') return setupLevel({ ...base, levelIndex: run.levelIndex + 1 });
+  const station = run.defs.dungeon?.stations.find((s) => s.id === run.stationId);
+  if (station?.interlude.length) {
+    return { ...enterInterlude(base, station.id, run.choices ?? station.next), result: undefined, choices: undefined, pending: [] };
+  }
   return setupLevel({ ...base, stationId: stationId ?? run.choices?.[0] ?? null });
 }
 
@@ -386,7 +410,7 @@ export function restartLevel(run: RunState): RunState {
 /** Ist ein vom Spieler gesteuerter Ally am Zug? (Allys mit Verhaltens-Effekt steuert die KI.) */
 export const isAllyTurn = (run: RunState) => {
   const u = currentUnit(run.battle);
-  return !run.result && run.battle.phase === 'kampf' && u?.side === 'ally' && !aiControlled(toCtx(run), u);
+  return !run.result && !run.interlude && run.battle.phase === 'kampf' && u?.side === 'ally' && !aiControlled(toCtx(run), u);
 };
 
 /** Führt eine Fähigkeit aus der Oberfläche heraus aus (Aktion wird verbraucht). */
@@ -411,7 +435,7 @@ export function resolveReaction(run: RunState, abilityId: string | null, targets
 
 /** Ein KI-Schritt; null = Zug ist zu Ende. */
 export function aiTurnStep(run: RunState): RunState | null {
-  if (run.result || run.battle.phase !== 'kampf') return null;
+  if (run.result || run.interlude || run.battle.phase !== 'kampf') return null;
   if (run.pending?.length) return run; // erst die Reaktionen der Allys abwarten
   const ctx = aiStep(toCtx(run));
   return ctx ? fromCtx(run, ctx) : null;

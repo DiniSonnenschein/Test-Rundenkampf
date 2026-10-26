@@ -85,7 +85,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 10 | Level-Editor | ✅ |
 | 11 | Dungeon-Editor | ✅ |
 | 12 | Neues Spiel (Setup) | ✅ |
-| 13 | Spielmodus (Kampf-Oberfläche) | 🟦 13a+13b fertig, 13c offen |
+| 13 | Spielmodus (Kampf-Oberfläche) | ✅ |
 | 14 | Speichern & Laden | ⬜ |
 | 15 | Balancing-Werkzeuge | ⬜ |
 | 16 | Import / Export & Datenaustausch | ⬜ |
@@ -182,6 +182,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | Form des Lichtkegels (Kreis / Quadrat) | Kreis |
 | Erkundete Felder bleiben aufgedeckt (Gelände ja, Figuren nein) | an |
 | Effekte laufen beim Levelwechsel weiter (sonst enden alle) | an |
+| Ressourcen der Allys beim Levelwechsel: behalten / Startwert / auffüllen – Grundregel plus Ausnahmen je Ressource | behalten |
 | Außerhalb des eigenen Zuges zur Quelle drehen, wenn Ziel von: nie / gegnerischen / allen / bestimmten Typen von Fähigkeiten/Effekten | nie |
 | Bei Initiative-Gleichstand: Allys zuerst / Gegner zuerst / abwechselnd | Allys zuerst |
 | Züge pro Charakter und Runde | 1 |
@@ -473,7 +474,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - **Grundboden** (Geländeart, mit der das Level gefüllt ist)
 - **Farben pro Level:** Standardfelder (2 Farben), Laternen-Startfeld (1), Siegfelder (2), Hintergrund / „kein Feld“ (1). Hell und dunkel ordnet der Editor im Schachbrett selbst zu. Andere Geländearten behalten ihre eigenen Farben.
 - **Vorschau** der Map, **Prüfung** (Warnungen: kein Grundboden, kein/nicht begehbares Laternen-Startfeld, keine Siegfelder, Siegfelder reichen für höchstens X Allys, Gegner auf nicht begehbarem Gelände, Dinge mit gelöschter Vorlage)
-- **Level testen** (Schnelltest mit Standard-Team) – folgt mit dem Spielmodus (Abschnitt 13)
+- **Level testen:** festes Test-Team pro Level (mit Anpassungen wie im Spiel-Editor, Laternenträger, Regelwerk); legt einen Spielstand „Test: Name – Datum“ an und startet sofort
 
 **Map-Editor** (Vollbild):
 - **Ein Finger** malt bzw. platziert, **zwei Finger** zoomen und verschieben (am Computer: Mausrad). Tipp-Aktionen werden erst beim Loslassen ausgeführt, damit der erste Finger eines Zooms nichts auslöst.
@@ -503,9 +504,10 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - **Belohnung:** Gegenstände, optional „wähle X davon“ (pro Station einstellbar); der Spieler wählt, welcher Ally sie bekommt
 - **Effekte** vergeben (mit Dauer) oder beenden (Effekt bzw. Typen), für alle Allys
 - **Rucksäcke ordnen & Gegenstände zwischen Allys tauschen**
-- **Händler:** bezahlt wird mit einer **globalen Ressource**; **Grundpreise je Objekt-Typ** und **Sonderpreise je Objekt** (gehen vor), jeweils mit **Kauf- und Verkaufspreis**; Angebot mit Vorrat (oder unbegrenzt). Nur kaufen und verkaufen, kein Tauschen.
+- **Ereignis mit Text:** Überschrift und Text zum Lesen
+- **Händler:** Schalter „kauft auch an“; bezahlt wird mit einer **globalen Ressource**; **Grundpreise je Objekt-Typ** und **Sonderpreise je Objekt** (gehen vor), jeweils mit **Kauf- und Verkaufspreis**; Angebot mit Vorrat (oder unbegrenzt). Nur kaufen und verkaufen, kein Tauschen.
 
-**Levelwechsel:** Gegenstände (Rucksack und Getragenes) bleiben · was am Boden liegt, ist weg · Gegner bleiben zurück, jedes Level startet frisch · ob Effekte weiterlaufen, legt das **Regelwerk** fest (ein Schalter für alle).
+**Levelwechsel:** Gegenstände (Rucksack und Getragenes) bleiben · was am Boden liegt, ist weg · Gegner bleiben zurück, jedes Level startet frisch · ob Effekte weiterlaufen und was mit den Ressourcen passiert (behalten, Startwert, auffüllen), legt das **Regelwerk** fest; zusätzliche **Ereignisse zwischen Leveln** (Ressource auffüllen / Startwert / Betrag, nach jedem oder einem bestimmten Level) im Spiel-Editor. Reihenfolge: Regelwerk → Ereignisse → Zwischenstation.
 
 **Umsetzung:**
 - `src/engine/dungeon.ts` – Datenmodell, Erreichbarkeit, Prüfung, Händler-Preise (mit Tests)
@@ -534,7 +536,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 **Ziel:** Alles spielbar machen. Umsetzung in drei Teilen:
 - **13a ✅** Spiel starten, Platzierung, Runden & Züge, Aktionen-Ring, Zielwahl, Bausteine Ressource/Effekt/Anwender bewegen/Ziel bewegen/Blickrichtung, Ressourcen-Events, Effekte (Dauer, dauerhafte Werte, Bewusstlos, Aussetzen, Sicht, Kollision), Nebel, Sieg/Niederlage, Rückgängig, Log
 - **13b ✅** alle übrigen Bausteine, Effekt-Auslöser und -Beendigungen, Reaktionen, Objekt- und Gelände-Wirkungen, Gegner-KI
-- **13c** Dungeon-Ablauf mit Zwischenstationen (inkl. Händler), „Level testen“
+- **13c ✅** Dungeon-Ablauf mit Zwischenstationen (inkl. Händler), Ressourcen beim Levelwechsel, „Level testen“
 
 **Bedienung (festgelegt):**
 - **Start:** „Spiel starten“ (Neues Spiel) legt automatisch einen Spielstand „Name – Datum“ an und speichert laufend. Das Spiel nutzt eine **Momentaufnahme aller Vorlagen** vom Start – spätere Änderungen in den Editoren wirken erst in einem neuen Spiel.
@@ -555,6 +557,8 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - **Gegenstände:** Passen bei „Objekt verwenden/geben/werfen“ bzw. „Platzieren aus dem Rucksack“ mehrere Gegenstände, wird gefragt, welcher.
 - **Darstellung:** Verwandelte Figuren zeigen Form und Farbe ihrer neuen Gestalt; wer jemanden trägt, bekommt einen kleinen Punkt; unsichtbare Gegner bleiben verborgen, bis sie aufgedeckt werden. Die Info-Anzeige nennt Getragenes und Verwandlungen.
 
+**Zwischenstation (13c):** eigene Seite nach dem Level (Knopf „Weiter zur Zwischenstation“). Rast und Effekte wirken sofort beim Betreten; Text wird angezeigt. Belohnungen und Käufe: der Spieler wählt den Ally (bei nur einem Ally direkt). Händler mit Vorrat; Verkaufen nur, wenn er ankauft und einen Preis hat. Rucksäcke: Geben, Wegwerfen, zwischen Rucksack und Tragen wechseln (volle Rucksäcke → wird getragen). Team-Übersicht mit Werten, Effekten und Gegenständen. „Zwischenstation zurücksetzen“ macht alle Entscheidungen dort rückgängig. Am Ende Verzweigung wählen bzw. „Weiter“; nicht vergebene Belohnungen werden vorher angemahnt.
+
 **KI (festgelegt in Abschnitt 8, umgesetzt in 13b):**
 - Kein Zufall: gleiche Lage → gleiches Handeln.
 - Wahrnehmung: eigenes Sichtfeld; steht der Gegner im Licht, sieht er alles Beleuchtete. Gesehene Allys werden gemerkt (für „letzte bekannte Position“).
@@ -570,6 +574,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - `src/engine/execute.ts` – Reichweite, legale Ziele, Wahrnehmung, Bedingungen, Kosten, Hindernisse, alle Bausteine
 - `src/engine/events.ts`, `src/engine/triggers.ts` – Ereignisse, Effekt-Auslöser/-Beendigungen (inkl. Bereiche), Reaktionen, Objekt- und Gelände-Wirkungen (mit Tests)
 - `src/engine/ai.ts` – Gegner-KI (mit Tests)
+- `src/engine/interlude.ts` – Levelwechsel (Regelwerk, Ereignisse), Zwischenstationen (mit Tests); `src/screens/game/InterludeView.tsx`
 - `src/engine/run.ts` – Spielablauf, Levelwechsel, Rückgängig, Reaktionen, KI-Schritte (mit Tests)
 - `src/game/snapshot.ts`, `src/screens/game/GameScreen.tsx`, `src/screens/game/GameMap.tsx`, `src/ui/usePanZoom.ts`
 
