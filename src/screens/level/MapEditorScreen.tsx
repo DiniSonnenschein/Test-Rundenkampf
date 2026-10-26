@@ -1,8 +1,9 @@
 // Map-Editor (Vollbild): ein Finger malt bzw. platziert, zwei Finger zoomen und verschieben.
+import { createAndOpen, NEW, newOption } from '../../ui/createNew';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { createEntry, newId, sortEntries } from '../../data/collection';
+import { newId, sortEntries } from '../../data/collection';
 import { getDef } from '../../data/model';
-import { getCollection, patchEntry, saveEntry, useCollection } from '../../data/store';
+import { getCollection, patchEntry, useCollection } from '../../data/store';
 import type { Facing } from '../../engine/facing';
 import { posKey, samePos, type Pos } from '../../engine/grid';
 import {
@@ -10,7 +11,7 @@ import {
   type LevelFields, type PlacedEnemy, type PlacedObject, type Thing,
 } from '../../engine/level';
 import { normalizeObject } from '../../engine/objects';
-import { navigate, routes } from '../../router';
+import { routes } from '../../router';
 import { useDialog } from '../../ui/Dialog';
 import { Header } from '../../ui/Header';
 import { MapView } from './MapView';
@@ -316,17 +317,19 @@ export function MapEditorScreen({ id }: { id: string }) {
   async function chooseBrush() {
     if (tool === 'gegner' || tool === 'objekt') {
       const key = tool === 'gegner' ? 'gegner' : 'objekte';
-      const items = sortEntries(getCollection(key).entries).map((x) => ({ label: x.title, value: x.id }));
-      if (!items.length) return setMessage(`Lege zuerst ${tool === 'gegner' ? 'Gegner' : 'Objekte'} an.`);
+      const items = [...sortEntries(getCollection(key).entries).map((x) => ({ label: x.title, value: x.id })), newOption(key)!];
       const picked = await dialog.menu({ title: tool === 'gegner' ? 'Gegner wählen' : 'Objekt wählen', items });
+      if (picked === NEW) return openNew(key);
       if (picked) setBrush((b) => (tool === 'gegner' ? { ...b, enemyId: picked } : { ...b, objectId: picked }));
       return;
     }
     const items = [
       ...sortEntries(gelaende.entries).map((x) => ({ label: x.title + (x.id === level!.baseTerrainId ? ' (Grundboden)' : ''), value: x.id })),
       { label: '⬛ Kein Feld', value: NO_TILE },
+      newOption('gelaende')!,
     ];
     const picked = await dialog.menu({ title: 'Geländeart wählen', items });
+    if (picked === NEW) return openNew('gelaende');
     if (picked) setBrush((b) => ({ ...b, terrain: picked }));
   }
 
@@ -352,12 +355,13 @@ export function MapEditorScreen({ id }: { id: string }) {
 
   async function createNew() {
     const key = await dialog.menu({ title: 'Neu anlegen', items: CREATE.map((c) => ({ label: c.label, value: c.key })) });
-    const def = key ? getDef(key) : undefined;
-    if (!def) return;
-    const e = createEntry(def, null);
-    saveEntry(def.key, e);
-    lastCreated = { key: def.key, id: e.id };
-    navigate(routes.entry(def.key, e.id));
+    if (key) openNew(key);
+  }
+
+  /** Neuen Eintrag anlegen und öffnen; zurück im Map-Editor ist er als Pinsel gewählt. */
+  function openNew(key: string) {
+    if (!getDef(key)) return;
+    lastCreated = { key, id: createAndOpen(key) };
   }
 
   function updateSelected(item: PlacedEnemy | PlacedObject) {

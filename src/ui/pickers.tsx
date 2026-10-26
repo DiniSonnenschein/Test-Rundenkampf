@@ -3,6 +3,7 @@ import { createEntry, sortEntries } from '../data/collection';
 import { getDef, type Entry } from '../data/model';
 import { getCollection, saveEntry, useCollection } from '../data/store';
 import type { Selection } from '../engine/effects';
+import { createAndOpen, NEW, newOption } from './createNew';
 import { useDialog } from './Dialog';
 import { Toggle } from './fields';
 
@@ -22,13 +23,14 @@ function Chips({ items, onRemove }: { items: { id: string; label: string }[]; on
 
 /** Mehrere Einträge einer Sammlung auswählen. */
 export function MultiRefPicker({
-  collection, value, onChange, addLabel, filter,
+  collection, value, onChange, addLabel, filter, newDefaults,
 }: {
   collection: string;
   value: string[];
   onChange: (ids: string[]) => void;
   addLabel: string;
   filter?: (e: Entry) => boolean;
+  newDefaults?: Partial<Entry>;
 }) {
   const col = useCollection(collection);
   const dialog = useDialog();
@@ -36,12 +38,15 @@ export function MultiRefPicker({
   const available = sortEntries(col.entries.filter((e) => !value.includes(e.id) && (!filter || filter(e))));
 
   async function add() {
-    if (!available.length) {
+    const create = newOption(collection);
+    if (!available.length && !create) {
       await dialog.confirm({ title: 'Nichts verfügbar', message: `Lege zuerst Einträge unter „${getDef(collection)?.label}“ an.`, confirmLabel: 'OK' });
       return;
     }
-    const id = await dialog.menu({ title: addLabel, items: available.map((e) => ({ label: e.title || 'Ohne Titel', value: e.id })) });
-    if (id) onChange([...value, id]);
+    const items = [...available.map((e) => ({ label: e.title || 'Ohne Titel', value: e.id })), ...(create ? [create] : [])];
+    const id = await dialog.menu({ title: addLabel, items });
+    if (id === NEW) onChange([...value, createAndOpen(collection, newDefaults)]);
+    else if (id) onChange([...value, id]);
   }
 
   return (

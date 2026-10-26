@@ -212,13 +212,13 @@ p { margin: 0 0 1em; line-height: 1.5; }
   position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px;
   border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000a, 0 2px 6px #000a; pointer-events: none;
 }
-.slider { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; border-radius: 7px; border: 1px solid var(--border); }
-.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid #000; }
-.slider::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid #000; }
+.slider { position: relative; width: calc(100% - 28px); margin: 8px 14px; height: 14px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; }
+.slider::before { content: ''; position: absolute; inset: -12px -14px; } /* größere Tippfläche */
+.slider-thumb { position: absolute; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; background: #fff; border: 2px solid #000; pointer-events: none; }
 .color-row { display: flex; align-items: center; gap: 12px; }
 .color-preview { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); }
-.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-.swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.swatch { width: 100%; aspect-ratio: 1; max-width: 38px; border-radius: 50%; padding: 0; border: 2px solid var(--border); cursor: pointer; }
 
 .stepper { display: flex; gap: 8px; }
 .stepper .btn { width: 56px; flex: none; font-size: 1.4rem; padding: 0; }

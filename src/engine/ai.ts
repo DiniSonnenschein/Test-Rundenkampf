@@ -14,7 +14,8 @@ interface Option {
   def: AbilityFields;
 }
 
-const isMovement = (a: AbilityFields) => a.blocks.some((b) => b.kind === 'anwender-bewegen');
+/** Reine Bewegung auf ein Feld („Anwender bewegen“ auf ein Zielfeld); hin/weg zählen als normale Fähigkeit mit Ziel. */
+const isMovement = (a: AbilityFields) => a.blocks.some((b) => b.kind === 'anwender-bewegen' && (b.mode ?? 'feld') === 'feld');
 
 /** Nutzbare Fähigkeiten (Aktion noch frei bzw. auf diese Fähigkeit festgelegt, Bedingungen erfüllt, bezahlbar). */
 function options(ctx: Ctx, u: Unit): Option[] {

@@ -124,6 +124,7 @@ function InterludeFields({ b, set }: { b: InterludeBlock; set: (b: InterludeBloc
             value={b.currencyId}
             emptyLabel="– Ressource wählen –"
             filter={(e) => (e as Entry & { scope?: string }).scope === 'global'}
+            newDefaults={{ scope: 'global' } as Partial<Entry>}
             onChange={(currencyId) => set({ ...b, currencyId })}
           />
           <span className="field-label">Grundpreise je Objekt-Typ</span>

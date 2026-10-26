@@ -1,4 +1,5 @@
 // Charakter-Editor für Allys (Gegner nutzen ihn später mit zusätzlichen Feldern).
+import { createAndOpen, NEW, newOption } from '../../ui/createNew';
 import { sortEntries } from '../../data/collection';
 import type { Entry } from '../../data/model';
 import { useCollection } from '../../data/store';
@@ -24,12 +25,9 @@ function ResourcesCard({ resources, set }: { resources: CharacterResource[]; set
   const edit = (i: number, patch: Partial<CharacterResource>) => set(resources.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   async function add() {
-    if (!available.length) {
-      await dialog.confirm({ title: 'Keine weiteren Ressourcen', message: 'Lege zuerst weitere individuelle Ressourcen an.', confirmLabel: 'OK' });
-      return;
-    }
-    const id = await dialog.menu({ title: 'Ressource hinzufügen', items: available.map((e) => ({ label: e.title, value: e.id })) });
-    if (id) set([...resources, newCharacterResource(id)]);
+    const id = await dialog.menu({ title: 'Ressource hinzufügen', items: [...available.map((e) => ({ label: e.title, value: e.id })), newOption('ressourcen')!] });
+    if (id === NEW) set([...resources, newCharacterResource(createAndOpen('ressourcen'))]);
+    else if (id) set([...resources, newCharacterResource(id)]);
   }
 
   return (
@@ -71,11 +69,8 @@ function ActionsCard({ actions, set }: { actions: CharacterAction[]; set: (a: Ch
 
   async function addAbility(i: number) {
     const options = sortEntries(col.entries.filter((e) => !actions[i].abilities.some((a) => a.abilityId === e.id)));
-    if (!options.length) {
-      await dialog.confirm({ title: 'Keine Fähigkeiten verfügbar', message: 'Lege zuerst Fähigkeiten an.', confirmLabel: 'OK' });
-      return;
-    }
-    const id = await dialog.menu({ title: 'Fähigkeit hinzufügen', items: options.map((e) => ({ label: e.title, value: e.id })) });
+    const picked = await dialog.menu({ title: 'Fähigkeit hinzufügen', items: [...options.map((e) => ({ label: e.title, value: e.id })), newOption('faehigkeiten')!] });
+    const id = picked === NEW ? createAndOpen('faehigkeiten') : picked;
     if (id) edit(i, { abilities: [...actions[i].abilities, { abilityId: id, maxUses: 1 }] });
   }
 

@@ -89,8 +89,13 @@ export type AbilityBlockBody =
    * Unabhängig von Blickrichtungen. Hindernisse stoppen die Bewegung (außer sie werden ignoriert).
    */
   | { kind: 'ziel-bewegen'; mode: 'richtung' | 'weg' | 'hin'; area: Area; distance: number; ignoresObstacles: boolean }
-  /** Mögliche Zielfelder als Bereich (unabhängig von der Blickrichtung). Ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung. */
-  | { kind: 'anwender-bewegen'; area: Area; ignoresObstacles: boolean }
+  /**
+   * feld: auf ein Zielfeld aus dem Bereich (unabhängig von der Blickrichtung); ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung.
+   * hin/weg: in gerader Linie bis zu `distance` Felder in Richtung Ziel bzw. vom Ziel weg; bei „hin“ endet die Bewegung
+   * vor dem Ziel, auf dem Ziel oder geht darüber hinaus (stop). Hindernisse: wie bei der Fähigkeit eingestellt (z. B. Abprallen);
+   * mit „Hindernisse ignorieren“ ein Sprung auf das letzte freie Feld.
+   */
+  | { kind: 'anwender-bewegen'; area: Area; ignoresObstacles: boolean; mode?: 'feld' | 'hin' | 'weg'; distance?: number; stop?: 'davor' | 'auf' | 'darueber' }
   | { kind: 'gelaende'; terrainId: string | null }
   /** Nur Objekte und Gegner: werden aus dem Level entfernt. */
   | { kind: 'zerstoeren' }

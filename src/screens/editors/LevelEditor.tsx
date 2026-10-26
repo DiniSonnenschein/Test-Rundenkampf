@@ -1,4 +1,5 @@
 // Level-Einstellungen: Größe, Grundboden, Farben, Vorschau und Prüfung. Die Map selbst wird im Map-Editor bearbeitet.
+import { createAndOpen, NEW, newOption } from '../../ui/createNew';
 import { newId, sortEntries } from '../../data/collection';
 import type { Entry } from '../../data/model';
 import { getCollection } from '../../data/store';
@@ -88,9 +89,9 @@ function TestSection({ entry, set }: EditorProps) {
 
   async function addMember() {
     const items = sortEntries(getCollection('allys').entries).map((a) => ({ label: a.title, value: a.id }));
-    if (!items.length) return dialog.confirm({ title: 'Keine Allys', message: 'Lege zuerst Allys an.', confirmLabel: 'OK' });
-    const allyId = await dialog.menu({ title: 'Ally hinzufügen', items });
-    if (!allyId) return;
+    const picked = await dialog.menu({ title: 'Ally hinzufügen', items: [...items, newOption('allys')!] });
+    if (!picked) return;
+    const allyId = picked === NEW ? createAndOpen('allys') : picked;
     const m: TeamMember = { id: newId('mitglied'), allyId, items: null, resources: {} };
     update({ team: [...t.team, m], lanternMemberId: t.lanternMemberId ?? m.id });
   }

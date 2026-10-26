@@ -1,4 +1,5 @@
 // Wiederverwendbare Eingabefelder für die Editoren.
+import { createAndOpen, NEW, newOption } from './createNew';
 import { useEffect, useState } from 'react';
 import { sortEntries } from '../data/collection';
 import type { Entry } from '../data/model';
@@ -76,7 +77,7 @@ export function Choice<T extends string>({ value, options, onChange }: { value: 
 
 /** Auswahl eines Eintrags aus einer anderen Sammlung (Verweis per ID). */
 export function RefSelect({
-  collection, value, onChange, emptyLabel, id, filter,
+  collection, value, onChange, emptyLabel, id, filter, newDefaults,
 }: {
   collection: string;
   filter?: (e: Entry) => boolean;
@@ -84,14 +85,28 @@ export function RefSelect({
   onChange: (id: string | null) => void;
   emptyLabel: string;
   id?: string;
+  /** Vorgaben für „+ Neu … anlegen“ (z. B. globale Ressource). */
+  newDefaults?: Partial<Entry>;
 }) {
   const col = useCollection(collection);
+  const create = newOption(collection);
   return (
-    <select id={id} className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+    <select
+      id={id}
+      className="input"
+      value={value ?? ''}
+      onChange={(e) => {
+        if (e.target.value === NEW) {
+          const newId = createAndOpen(collection, newDefaults);
+          onChange(newId);
+        } else onChange(e.target.value || null);
+      }}
+    >
       <option value="">{emptyLabel}</option>
-      {sortEntries(filter ? col.entries.filter(filter) : col.entries).map((e) => (
+      {sortEntries(filter ? col.entries.filter((x) => filter(x) || x.id === value) : col.entries).map((e) => (
         <option key={e.id} value={e.id}>{e.title || 'Ohne Titel'}</option>
       ))}
+      {create && <option value={NEW}>{create.label}</option>}
     </select>
   );
 }

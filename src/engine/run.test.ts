@@ -261,3 +261,47 @@ describe('Größen & Sicht im Licht', () => {
     expect(perception(toCtx(run2), getUnit(run2.battle, 'g1')!).has('1,5')).toBe(true);
   });
 });
+
+describe('Anwender bewegen: in Richtung Ziel / vom Ziel weg', () => {
+  const setup = async (block: Record<string, unknown>, obstacle?: Record<string, unknown>) => {
+    const { debugMoveUnit } = await import('./debug');
+    const defs = makeDefs();
+    const big: string[] = [];
+    for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) big.push(`${x},${y}`);
+    defs.abilities.ansturm = ability('Ansturm', {
+      targeting: { ...DEFAULT_ABILITY.targeting, range: big, ignoresObstacles: true, ...(obstacle ? { obstacle: { ...DEFAULT_ABILITY.targeting.obstacle, ...obstacle } } : {}) },
+      blocks: [{ kind: 'anwender-bewegen', area: [], ignoresObstacles: false, extraCosts: [], ...block } as unknown as AbilityFields['blocks'][number]],
+    });
+    let run = beginCombat(createRun(game, defs));
+    run = debugMoveUnit(run, 'g1', { x: 5, y: 6 });
+    return run;
+  };
+  const pos = (run: RunState) => getUnit(run.battle, 'm1')!.pos;
+
+  it('hin, endet ein Feld davor (höchstens 3 Felder)', async () => {
+    let run = await setup({ mode: 'hin', distance: 3, stop: 'davor' });
+    run = act(run, 'ansturm', [{ x: 5, y: 6 }]);
+    expect(pos(run)).toEqual({ x: 4, y: 6 });
+  });
+
+  it('hin, nur 2 Felder weit', async () => {
+    let run = await setup({ mode: 'hin', distance: 2, stop: 'davor' });
+    run = act(run, 'ansturm', [{ x: 5, y: 6 }]);
+    expect(pos(run)).toEqual({ x: 3, y: 6 });
+  });
+
+  it('darüber hinaus: das Ziel ist ein Hindernis → bleibt davor stehen; Abbruch → keine Bewegung', async () => {
+    let run = await setup({ mode: 'hin', distance: 6, stop: 'darueber' });
+    run = act(run, 'ansturm', [{ x: 5, y: 6 }]);
+    expect(pos(run)).toEqual({ x: 4, y: 6 });
+    let run2 = await setup({ mode: 'hin', distance: 6, stop: 'darueber' }, { behavior: 'abbruch' });
+    run2 = act(run2, 'ansturm', [{ x: 5, y: 6 }]);
+    expect(pos(run2)).toEqual({ x: 1, y: 6 });
+  });
+
+  it('weg vom Ziel bis zum Rand der Map', async () => {
+    let run = await setup({ mode: 'weg', distance: 4 });
+    run = act(run, 'ansturm', [{ x: 5, y: 6 }]);
+    expect(pos(run)).toEqual({ x: 0, y: 6 });
+  });
+});

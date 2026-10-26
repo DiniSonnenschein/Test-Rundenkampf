@@ -3,7 +3,40 @@ import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { hexToRgb, hsvToHex, rgbToHsv, type Hsv } from './color';
 
 const SIZE = 220;
-const SWATCHES = ['#d9772b', '#b5432b', '#e0a83a', '#7d8a3a', '#6b4226', '#3b6e8f', '#7a4f9a', '#e8e0d0'];
+/** Schnellwahl: je Farbton ein heller, ein mittlerer und ein dunkler Ton, dazu Graustufen. */
+const SWATCHES = [
+  ['#ffffff', '#f6d9b8', '#f4b6a8', '#fbe8a6', '#d5e8b0', '#b8e0d2', '#b9d6f2', '#d8c4ec'],
+  ['#9a9a9a', '#d9772b', '#b5432b', '#e0a83a', '#7d8a3a', '#3f9a7c', '#3b6e8f', '#7a4f9a'],
+  ['#000000', '#6b4226', '#5e2018', '#7a5a14', '#3d4a1c', '#1d4d3e', '#1c3448', '#3a2650'],
+];
+
+/** Eigener Schieberegler (ohne Eingabefeld – nimmt keinen Fokus, springt auf dem Handy nicht ins nächste Feld). */
+function Slider({ value, onChange, background, label }: { value: number; onChange: (v: number) => void; background: string; label: string }) {
+  function pick(e: PointerEvent<HTMLDivElement>) {
+    if (e.type === 'pointermove' && e.buttons === 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    onChange(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+  }
+  return (
+    <div
+      className="slider"
+      role="slider"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value * 100)}
+      style={{ background, touchAction: 'none' }}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        pick(e);
+      }}
+      onPointerMove={pick}
+    >
+      <span className="slider-thumb" style={{ left: `${value * 100}%` }} />
+    </div>
+  );
+}
 
 export function ColorWheel({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -22,7 +55,7 @@ export function ColorWheel({ value, onChange }: { value: string; onChange: (hex:
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d');
     if (!ctx) return;
-    const dpr = 2;
+    const dpr = 1;
     const px = SIZE * dpr;
     const img = ctx.createImageData(px, px);
     const r = px / 2;
@@ -64,8 +97,8 @@ export function ColorWheel({ value, onChange }: { value: string; onChange: (hex:
       <div className="color-wheel-disc" style={{ width: SIZE, height: SIZE }}>
         <canvas
           ref={canvas}
-          width={SIZE * 2}
-          height={SIZE * 2}
+          width={SIZE}
+          height={SIZE}
           style={{ width: SIZE, height: SIZE, touchAction: 'none' }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -76,16 +109,10 @@ export function ColorWheel({ value, onChange }: { value: string; onChange: (hex:
         <span className="color-wheel-marker" style={{ left: markerX, top: markerY, background: value }} />
       </div>
 
-      <label className="field-label">Helligkeit</label>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={Math.round(hsv.v * 100)}
-        onChange={(e) => update({ ...hsv, v: Number(e.target.value) / 100 })}
-        className="slider"
-        style={{ background: `linear-gradient(90deg, #000, ${hsvToHex({ ...hsv, v: 1 })})` }}
-      />
+      <span className="field-label">Helligkeit</span>
+      <Slider label="Helligkeit" value={hsv.v} onChange={(v) => update({ ...hsv, v })} background={`linear-gradient(90deg, #000, ${hsvToHex({ ...hsv, v: 1 })})`} />
+      <span className="field-label">Farbstärke</span>
+      <Slider label="Farbstärke" value={hsv.s} onChange={(s) => update({ ...hsv, s })} background={`linear-gradient(90deg, ${hsvToHex({ ...hsv, s: 0 })}, ${hsvToHex({ ...hsv, s: 1 })})`} />
 
       <div className="color-row">
         <span className="color-preview" style={{ background: value }} />
@@ -100,11 +127,13 @@ export function ColorWheel({ value, onChange }: { value: string; onChange: (hex:
           }}
         />
       </div>
-      <div className="swatches">
-        {SWATCHES.map((c) => (
-          <button key={c} className="swatch" style={{ background: c }} aria-label={c} onClick={() => update(rgbToHsv(hexToRgb(c)!))} />
-        ))}
-      </div>
+      {SWATCHES.map((row, i) => (
+        <div key={i} className="swatches">
+          {row.map((c) => (
+            <button key={c} className="swatch" style={{ background: c }} aria-label={c} onClick={() => update(rgbToHsv(hexToRgb(c)!))} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

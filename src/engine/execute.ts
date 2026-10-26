@@ -395,6 +395,47 @@ export function matchingItems(ctx: Ctx, u: Unit, sel: Selection): string[] {
   return [...new Set([...(u.items ?? []), ...(u.carried ?? [])].filter((i) => i.count > 0 && itemFits(ctx, sel, i.objectId)).map((i) => i.objectId))];
 }
 
+/**
+ * „Anwender bewegen“ in Richtung Ziel bzw. vom Ziel weg: Felder in gerader Linie (höchstens `distance`).
+ * null = durch ein Hindernis abgebrochen (keine Bewegung). Mit „Hindernisse ignorieren“ endet die Liste auf dem letzten freien Feld.
+ */
+export function selfMovePath(ctx: Ctx, self: Unit, a: AbilityFields, b: Extract<AbilityBlock, { kind: 'anwender-bewegen' }>, target: Pos): Pos[] | null {
+  if (!self.pos || samePos(self.pos, target)) return [];
+  const mode = b.mode ?? 'feld';
+  const max = Math.max(0, b.distance ?? 1);
+  const dx = (target.x - self.pos.x) * (mode === 'weg' ? -1 : 1);
+  const dy = (target.y - self.pos.y) * (mode === 'weg' ? -1 : 1);
+  // Weit über das Ziel hinaus verlängern, damit „darüber hinaus“ und „weg“ eine Richtung haben.
+  const k = 4 * (ctx.battle.map.width + ctx.battle.map.height);
+  const far = { x: self.pos.x + dx * k, y: self.pos.y + dy * k };
+  const blocked = (p: Pos) => !canEnter(ctx, self, p);
+  const o = a.targeting.obstacle;
+  const r = traceProjectile(
+    ctx.battle.map,
+    self.pos,
+    far,
+    b.ignoresObstacles ? (p) => isVoidTile(ctx.battle, p) : blocked,
+    () => false,
+    b.ignoresObstacles || o.behavior !== 'abprallen' ? 0 : o.maxBounces,
+  );
+  let path = r.outcome === 'hindernis' ? r.path.slice(0, -1) : r.path;
+  // Bei „hin“: vor bzw. auf dem Ziel anhalten.
+  if (mode === 'hin' && (b.stop ?? 'auf') !== 'darueber') {
+    const i = path.findIndex((p) => samePos(p, target));
+    if (i >= 0) path = path.slice(0, b.stop === 'davor' ? i : i + 1);
+  }
+  const reachesObstacle = r.outcome === 'hindernis' && path.length === r.path.length - 1 && path.length < max;
+  path = path.slice(0, max);
+  if (reachesObstacle && !b.ignoresObstacles) {
+    const behavior = o.behavior === 'abprallen' ? o.final : o.behavior;
+    if (behavior === 'abbruch') return null;
+  }
+  if (b.ignoresObstacles) {
+    while (path.length && blocked(path[path.length - 1])) path.pop();
+  }
+  return path;
+}
+
 /** Ein Objekt auf die Map legen (Kollision: nur, wenn frei – sonst daneben auf ein freies Feld). */
 function dropObject(ctx: Ctx, objectId: string, at: Pos): Ctx {
   const d = ctx.defs.objects[objectId];
@@ -461,6 +502,12 @@ export function applyBlock(ctx: Ctx, caster: Unit, abilityId: string, a: Ability
     case 'anwender-bewegen': {
       const target = targets[0];
       if (!target || !self?.pos) return ctx;
+      if ((b.mode ?? 'feld') !== 'feld') {
+        const path = selfMovePath(ctx, self, a, b, target);
+        if (path === null) return log(ctx, `${self.name}: Bewegung wird von einem Hindernis abgebrochen.`);
+        if (!path.length) return ctx;
+        return moveAlong(ctx, self.id, b.ignoresObstacles ? [path[path.length - 1]] : path);
+      }
       const allowed = b.area.length === 0 || areaTiles(self.pos, b.area, 'n').some((p) => samePos(p, target));
       if (!allowed) return log(ctx, `${self.name}: Zielfeld liegt außerhalb der möglichen Bewegung.`);
       if (b.ignoresObstacles) return canEnter(ctx, self, target) ? moveAlong(ctx, self.id, [target]) : ctx;

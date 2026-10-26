@@ -380,19 +380,49 @@ function BlockFields({ b, set }: { b: AbilityBlock; set: (b: AbilityBlock) => vo
           <Toggle label="Hindernisse ignorieren" hint="Sonst stoppt die Bewegung am Hindernis" checked={b.ignoresObstacles} onChange={(ignoresObstacles) => set({ ...b, ignoresObstacles })} />
         </>
       );
-    case 'anwender-bewegen':
+    case 'anwender-bewegen': {
+      const mode = b.mode ?? 'feld';
       return (
         <>
-          <span className="field-label">Mögliche Zielfelder (oben = Norden, unabhängig von der Blickrichtung)</span>
-          <AreaPicker value={b.area} onChange={(area) => set({ ...b, area })} />
+          <Choice<'feld' | 'hin' | 'weg'>
+            value={mode}
+            options={[{ value: 'feld', label: 'Auf ein Feld' }, { value: 'hin', label: 'In Richtung Ziel' }, { value: 'weg', label: 'Vom Ziel weg' }]}
+            onChange={(m) => set({ ...b, mode: m, distance: b.distance ?? 3, stop: b.stop ?? 'davor' })}
+          />
+          {mode === 'feld' ? (
+            <>
+              <span className="field-label">Mögliche Zielfelder (oben = Norden, unabhängig von der Blickrichtung)</span>
+              <AreaPicker value={b.area} onChange={(area) => set({ ...b, area })} />
+            </>
+          ) : (
+            <>
+              <p className="muted small">
+                Gerade Linie {mode === 'hin' ? 'auf das gewählte Ziel zu' : 'vom gewählten Ziel weg'}. Bei Hindernissen gilt die Einstellung oben unter
+                „Hindernisse“ (z. B. Abprallen).
+              </p>
+              <label className="field-label">Höchstens Felder</label>
+              <Stepper value={b.distance ?? 3} min={1} onChange={(distance) => set({ ...b, distance })} />
+              {mode === 'hin' && (
+                <>
+                  <span className="field-label">Bewegung endet</span>
+                  <Choice<'davor' | 'auf' | 'darueber'>
+                    value={b.stop ?? 'davor'}
+                    options={[{ value: 'davor', label: 'Ein Feld davor' }, { value: 'auf', label: 'Auf dem Ziel' }, { value: 'darueber', label: 'Darüber hinaus' }]}
+                    onChange={(stop) => set({ ...b, stop })}
+                  />
+                </>
+              )}
+            </>
+          )}
           <Toggle
             label="Hindernisse ignorieren"
-            hint={b.ignoresObstacles ? 'Sprung auf das Zielfeld' : 'Läuft einen Weg ohne Blockade'}
+            hint={b.ignoresObstacles ? (mode === 'feld' ? 'Sprung auf das Zielfeld' : 'Sprung auf das letzte freie Feld') : mode === 'feld' ? 'Läuft einen Weg ohne Blockade' : 'Hindernisse wie oben eingestellt'}
             checked={b.ignoresObstacles}
             onChange={(ignoresObstacles) => set({ ...b, ignoresObstacles })}
           />
         </>
       );
+    }
     case 'gelaende':
       return (
         <>

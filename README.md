@@ -141,7 +141,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - **Gemeinsame Felder** jedes Eintrags (auch Spiele/Spielstände): **Titel**, **Notiz** (+ Ordner).
 - **Darstellung** für Allys, Gegner und Objekte (sichtbare Entitäten im Spiel):
   - **Form** – Auswahl aus vorgespeicherten Vektorformen (vorläufig 8 Grundformen: Kreis, Quadrat, Dreieck, Raute, Fünfeck, Sechseck, Stern, Kreuz; die endgültige Formen-Bibliothek wird später ausgearbeitet)
-  - **Farbe** – Farbrad mit Helligkeitsregler, Hex-Eingabe und Herbst-Farbvorschlägen
+  - **Farbe** – Farbrad mit Reglern für **Helligkeit** und **Farbstärke** (Weiß ↔ volle Farbe), Hex-Eingabe und Schnellwahl in hellen, mittleren und dunklen Tönen; alle Farben frei wählbar (überall, auch Gelände)
   - **Größe** – Breite × Höhe in Feldern (je 1–4, Standard 1×1)
 - **Navigation:** Zurück-Pfeil oben links; die Android-Zurück-Taste funktioniert ebenfalls.
 - **Neues Spiel:** Liste von Spiel-Konfigurationen (gleiche Funktionen wie im Editor). So lassen sich Test-Setups speichern, duplizieren und variieren. „Spielstand laden“ listet die beim Spielen gespeicherten Stände (dort kein „+ Neu“).
@@ -151,6 +151,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 - `src/data/collection.ts`, `src/data/references.ts` – Ordner, Sortierung, Suche, Duplizieren, Verweise (mit Tests)
 - `src/screens/` – Startbildschirm, Erstellen, Liste, Eintrag, Einstellungen
 - `src/ui/` – Dialoge, Formen, Farbrad, Kopfzeile
+- **„+ Neu … anlegen“** in allen Auswahllisten (Fähigkeiten, Effekte, Ressourcen, Objekte, Gegner, Allys, Geländearten, Regelwerke …): legt den Eintrag an und öffnet seinen Editor; mit „Zurück“ geht es an die alte Stelle, der neue Eintrag ist schon ausgewählt (`src/ui/createNew.ts`)
 
 ### 2 – Kampfregeln – der Kern
 **Ziel:** Die grundlegenden Spielregeln, auf denen alles andere aufbaut.
@@ -335,7 +336,7 @@ Der Regelwerk-Editor enthält eine kleine **Licht-Vorschau**, die Laterne und Sc
 | Fähigkeit auslösen/unterbrechen | bestimmte Fähigkeit oder Typen des Ziels |
 | Einmaliger Schutz | vor der nächsten eingehenden Fähigkeit / Effekt / Ressourcen-Änderung; von beliebiger Quelle / Gegnern / Allys / Typen; Dauer frei wählbar |
 | Ziel bewegen | in Richtung (mögliche Zielfelder per Bereich, oben = Norden) / vom Anwender weg / zum Anwender hin um X Felder; Hindernisse stoppen (außer ignoriert) |
-| Anwender bewegen | zum gewählten Ort (mögliche Felder per Bereich, oben = Norden); ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung |
+| Anwender bewegen | **auf ein Feld** (mögliche Felder per Bereich, oben = Norden; ohne „Hindernisse ignorieren“ ein Weg ohne Blockade, sonst ein Sprung) · **in Richtung Ziel** bzw. **vom Ziel weg**: gerade Linie, höchstens N Felder; bei „in Richtung Ziel“ endet sie **ein Feld davor**, **auf dem Ziel** oder geht **darüber hinaus**; Hindernisse wie bei der Fähigkeit eingestellt (Abbruch, davor stehen bleiben, Abprallen …), mit „Hindernisse ignorieren“ Sprung auf das letzte freie Feld. Vorschau des Wegs vor dem Bestätigen |
 | Feld in Geländeart umwandeln | bis zum Ende des Levels |
 | Ziel zerstören | nur Objekte und Gegner: werden aus dem Level entfernt |
 | Ziel ersetzen | nur Objekte und Gegner: dauerhaft in ein Objekt oder einen Gegner verwandelt (Position & Blickrichtung bleiben, Werte starten neu) |

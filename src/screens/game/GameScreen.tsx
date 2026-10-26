@@ -6,7 +6,7 @@ import {
 } from '../../engine/battle';
 import { titleOf } from '../../engine/defs';
 import type { AbilityFields } from '../../engine/abilities';
-import { affordable, conditionsMet, costsFor, findPath, legalTargets, matchingItems, perceives, rangeTiles, unitsAt, type ReactionContext } from '../../engine/execute';
+import { affordable, conditionsMet, costsFor, findPath, selfMovePath, legalTargets, matchingItems, perceives, rangeTiles, unitsAt, type ReactionContext } from '../../engine/execute';
 import { FACING_LABELS, type Facing } from '../../engine/facing';
 import { posKey, samePos, type Pos } from '../../engine/grid';
 import { aiTurnStep, beginCombat, canUndo, finishTurn, isAllyTurn, nextLevel, performAbility, resolveReaction, restartLevel, toCtx, undo, type RunState } from '../../engine/run';
@@ -278,7 +278,7 @@ export function GameScreen({ id }: { id: string }) {
       let chosen = has ? ui.chosen.filter((c) => !samePos(c, p)) : [...ui.chosen, p];
       if (chosen.length > def.targeting.maxTargets) chosen = chosen.slice(-def.targeting.maxTargets);
       if (!affordable(toCtx(run), actor.id, def, chosen)) return setMessage('Nicht genug für weitere Ziele.');
-      const moves = def.blocks.some((x) => x.kind === 'anwender-bewegen' && !x.ignoresObstacles);
+      const moves = def.blocks.some((x) => x.kind === 'anwender-bewegen' && (!x.ignoresObstacles || (x.mode ?? 'feld') !== 'feld'));
       if (def.targeting.maxTargets === 1 && chosen.length === 1 && !moves) return perform(ui.action, ui.abilityId, chosen, !!ui.reaction, ui.objectId);
       return setUi({ ...ui, chosen });
     }
@@ -354,6 +354,15 @@ export function GameScreen({ id }: { id: string }) {
     }
   }
 
+  /** Wegvorschau für „Anwender bewegen“ (Weg auf ein Feld bzw. gerade Linie zum/vom Ziel). */
+  function movePreview(unit: Unit, a: AbilityFields, to: Pos): Pos[] | undefined {
+    const b = a.blocks.find((x) => x.kind === 'anwender-bewegen');
+    if (!b || b.kind !== 'anwender-bewegen' || !unit.pos) return undefined;
+    if ((b.mode ?? 'feld') === 'feld') return b.ignoresObstacles ? undefined : [unit.pos, ...(findPath(ctx!, unit, to) ?? [])];
+    const path = selfMovePath(ctx!, unit, a, b, to);
+    return path?.length ? [unit.pos, ...path] : undefined;
+  }
+
   // ---------- Darstellung ----------
 
   const target = ui.kind === 'ziel' ? defs.abilities[ui.abilityId] : null;
@@ -364,9 +373,7 @@ export function GameScreen({ id }: { id: string }) {
     legal: target && actor ? legalTargets(ctx, actor.id, target, actorRc) : undefined,
     chosen: ui.kind === 'ziel' ? ui.chosen : undefined,
     path:
-      target && actor?.pos && ui.kind === 'ziel' && ui.chosen.length === 1 && target.blocks.some((x) => x.kind === 'anwender-bewegen' && !x.ignoresObstacles)
-        ? [actor.pos, ...(findPath(ctx, actor, ui.chosen[0]) ?? [])]
-        : undefined,
+      target && actor?.pos && ui.kind === 'ziel' && ui.chosen.length === 1 ? movePreview(actor, target, ui.chosen[0]) : undefined,
     hiddenIds,
   };
 

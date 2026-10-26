@@ -1,4 +1,5 @@
 // Spiel-Konfiguration: Regelwerk, Inhalt (Dungeon/Level), Team mit Laternenträger und test-eigenen Anpassungen.
+import { createAndOpen, NEW, newOption } from '../../ui/createNew';
 import { useState } from 'react';
 import { newId, sortEntries } from '../../data/collection';
 import type { Entry } from '../../data/model';
@@ -167,12 +168,9 @@ export function GameEditor({ entry, set }: EditorProps) {
 
   async function addMember() {
     const items = sortEntries(getCollection('allys').entries).map((a) => ({ label: a.title, value: a.id }));
-    if (!items.length) {
-      await dialog.confirm({ title: 'Keine Allys', message: 'Lege zuerst Allys an.', confirmLabel: 'OK' });
-      return;
-    }
-    const allyId = await dialog.menu({ title: 'Ally hinzufügen', items });
-    if (!allyId) return;
+    const picked = await dialog.menu({ title: 'Ally hinzufügen', items: [...items, newOption('allys')!] });
+    if (!picked) return;
+    const allyId = picked === NEW ? createAndOpen('allys') : picked;
     const m: TeamMember = { id: newId('mitglied'), allyId, items: null, resources: {} };
     update({ team: [...g.team, m], lanternMemberId: g.lanternMemberId ?? m.id });
   }
