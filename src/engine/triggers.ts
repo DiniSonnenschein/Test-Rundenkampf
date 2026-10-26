@@ -9,6 +9,7 @@ import { areaTiles } from './facing';
 import { posKey, samePos, type Pos } from './grid';
 import type { ObjectWorking } from './objects';
 import { effectDefs, endEffects, giveEffect, type Ctx } from './status';
+import { recordEvent } from './stats';
 
 const MAX_LOOPS = 200;
 
@@ -333,7 +334,7 @@ export function processEvents(ctx: Ctx): Ctx {
       continue;
     }
     const [e, ...rest] = queue;
-    ctx = { ...ctx, events: rest };
+    ctx = { ...ctx, events: rest, stats: ctx.stats && recordEvent(ctx.stats, ctx.battle, e) };
     ctx = effectTriggers(ctx, e);
     ctx = workingsOnEvent(ctx, e);
     ctx = reactions(ctx, e);

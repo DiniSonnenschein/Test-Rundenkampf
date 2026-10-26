@@ -5,8 +5,10 @@ import type { Pos } from './grid';
 export type GameEvent =
   | { kind: 'move'; unitId: string; from: Pos; to: Pos }
   | { kind: 'targeted'; targetId: string; sourceId: string; abilityId: string; typeIds: string[] }
-  | { kind: 'used'; casterId: string; abilityId: string; typeIds: string[]; targetIds: string[] }
-  | { kind: 'resource'; unitId: string; resourceId: string; before: number; after: number }
+  | { kind: 'used'; casterId: string; abilityId: string; typeIds: string[]; targetIds: string[]; reaction?: boolean }
+  /** causeId: Charakter, der die Veränderung verursacht hat (für die Statistik). */
+  | { kind: 'resource'; unitId: string; resourceId: string; before: number; after: number; causeId?: string }
+  | { kind: 'effect'; unitId: string; effectId: string; causeId?: string }
   | {
       kind: 'item';
       unitId: string;

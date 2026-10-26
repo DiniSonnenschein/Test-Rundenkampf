@@ -1,6 +1,6 @@
 // Spielmodus: Platzierung, Züge mit Aktionen-Ring, Zielwahl, Gegnerzüge, Rückgängig, Log und Ende.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { patchEntry, useCollection } from '../../data/store';
+import { getCollection, patchEntry, useCollection } from '../../data/store';
 import {
   actionState, currentUnit, getUnit, placeUnit, placementArea, turnUnit, visible, type Unit,
 } from '../../engine/battle';
@@ -17,6 +17,12 @@ import { Header } from '../../ui/Header';
 import { usePanZoom } from '../../ui/usePanZoom';
 import { GameMap } from './GameMap';
 import { InterludeView } from './InterludeView';
+import { StatsView } from './StatsView';
+import { aiIntent } from '../../engine/ai';
+import {
+  debugAddEnemy, debugAddObject, debugGiveEffect, debugMoveUnit, debugRemoveEffect, debugRemoveObjects, debugRemoveUnit, debugSetResource, debugWinLevel,
+} from '../../engine/debug';
+import { sortEntries } from '../../data/collection';
 
 type Ui =
   | { kind: 'aktionen' }
@@ -25,6 +31,9 @@ type Ui =
 
 /** Gegenstands-Bausteine, bei denen gewählt wird, welcher Gegenstand gemeint ist. */
 const ITEM_BLOCKS = ['objekt-verwenden', 'objekt-geben', 'objekt-werfen', 'platzieren'];
+
+/** Debug: worauf das nächste Antippen wirkt. */
+type DebugTap = { kind: 'versetzen'; unitId: string } | { kind: 'gegner'; id: string } | { kind: 'objekt'; id: string } | { kind: 'objekt-weg' };
 
 const FACINGS: Facing[] = ['n', 'o', 's', 'w'];
 const ARROWS: Record<Facing, string> = { n: '↑', o: '→', s: '↓', w: '←' };
@@ -38,6 +47,9 @@ export function GameScreen({ id }: { id: string }) {
   const [placing, setPlacing] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [noFog, setNoFog] = useState(false);
+  const [debugTap, setDebugTap] = useState<DebugTap | null>(null);
   const [fast, setFast] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const aiSteps = useRef({ key: '', n: 0 });
@@ -46,7 +58,13 @@ export function GameScreen({ id }: { id: string }) {
   const battle = run?.battle;
   const mapSize = { width: battle?.map.width ?? 10, height: battle?.map.height ?? 10 };
   const pz = usePanZoom(container, mapSize, onTap);
-  const seen = useMemo(() => (battle ? visible(battle) : new Set<string>()), [battle]);
+  const seen = useMemo(() => {
+    if (!battle) return new Set<string>();
+    if (!noFog) return visible(battle);
+    const all = new Set<string>();
+    for (let y = 0; y < battle.map.height; y++) for (let x = 0; x < battle.map.width; x++) all.add(posKey({ x, y }));
+    return all;
+  }, [battle, noFog]);
   const current = battle ? currentUnit(battle) : undefined;
   const allyTurn = run ? isAllyTurn(run) : false;
   const ctx = run ? toCtx(run) : null;
@@ -59,14 +77,14 @@ export function GameScreen({ id }: { id: string }) {
   // Gegner, die kein Ally wahrnimmt (unsichtbar) und die nicht aufgedeckt sind.
   const hiddenIds = useMemo(() => {
     const out = new Set<string>();
-    if (!battle || !ctx) return out;
+    if (!battle || !ctx || noFog) return out;
     const viewers = battle.units.filter((u) => u.side === 'ally' && u.status === 'aktiv');
     const revealed = new Set(battle.revealed ?? []);
     for (const u of battle.units) {
       if (u.side === 'enemy' && !revealed.has(u.id) && viewers.length && !viewers.some((v) => perceives(ctx, v, u))) out.add(u.id);
     }
     return out;
-  }, [battle]);
+  }, [battle, noFog]);
 
   // Automatisch speichern.
   useEffect(() => {
@@ -231,6 +249,14 @@ export function GameScreen({ id }: { id: string }) {
   function onTap(p: Pos) {
     if (!run) return;
     const b = run.battle;
+    if (debugTap) {
+      const t = debugTap;
+      setDebugTap(null);
+      if (t.kind === 'versetzen') return setRun(debugMoveUnit(run, t.unitId, p));
+      if (t.kind === 'gegner') return setRun(debugAddEnemy(run, t.id, p));
+      if (t.kind === 'objekt') return setRun(debugAddObject(run, t.id, p));
+      return setRun(debugRemoveObjects(run, p));
+    }
     if (b.phase === 'platzierung') {
       const here = unitsAt(b, p).find((u) => u.side === 'ally');
       if (here && !here.lantern) return setPlacing(here.id);
@@ -258,6 +284,74 @@ export function GameScreen({ id }: { id: string }) {
     }
     const unit = unitsAt(run.battle, p).find((u) => u.side === 'ally' || (seen.has(posKey(p)) && !hiddenIds.has(u.id)));
     setInfoId(unit?.id ?? null);
+  }
+
+  // ---------- Debug ----------
+
+  const aiBusy = battle.phase === 'kampf' && !r.result && !allyTurn && !pending;
+
+  const pick = async (key: string, title: string) =>
+    dialog.menu({ title, items: sortEntries(getCollection(key).entries).map((e) => ({ label: e.title, value: e.id })) });
+
+  async function debugMenu() {
+    const action = await dialog.menu({
+      title: '🛠 Debug',
+      items: [
+        { label: noFog ? 'Nebel an' : 'Nebel aus', value: 'nebel' },
+        { label: 'Gegner hinzufügen …', value: 'gegner' },
+        { label: 'Objekt hinzufügen …', value: 'objekt' },
+        { label: 'Objekte auf einem Feld entfernen …', value: 'objekt-weg' },
+        { label: 'Level sofort gewinnen', value: 'sieg' },
+      ],
+    });
+    if (action === 'nebel') setNoFog(!noFog);
+    if (action === 'sieg') setRun(debugWinLevel(r));
+    if (action === 'objekt-weg') {
+      setDebugTap({ kind: 'objekt-weg' });
+      setMessage('Feld antippen');
+    }
+    if (action === 'gegner' || action === 'objekt') {
+      const id = await pick(action === 'gegner' ? 'gegner' : 'objekte', action === 'gegner' ? 'Welcher Gegner?' : 'Welches Objekt?');
+      if (!id) return;
+      setDebugTap({ kind: action, id });
+      setMessage('Feld antippen');
+    }
+  }
+
+  async function debugUnit(u: Unit) {
+    const action = await dialog.menu({
+      title: `🛠 ${u.name}`,
+      items: [
+        { label: 'Ressource setzen …', value: 'ressource' },
+        { label: 'Effekt geben …', value: 'effekt' },
+        ...((u.effects ?? []).length ? [{ label: 'Effekt entfernen …', value: 'effekt-weg' }] : []),
+        { label: 'Versetzen …', value: 'versetzen' },
+        { label: 'Entfernen', value: 'entfernen', danger: true },
+      ],
+    });
+    if (action === 'ressource') {
+      const rid = await dialog.menu({ title: 'Welche Ressource?', items: Object.keys(u.values ?? {}).map((k) => ({ label: `${titleOf(defs, k)} (${valueOf(defs, u, k)})`, value: k })) });
+      if (!rid) return;
+      const v = await dialog.prompt({ title: `${titleOf(defs, rid)} setzen auf`, initial: String(valueOf(defs, u, rid) ?? 0), confirmLabel: 'Setzen' });
+      const n = v === null ? NaN : parseInt(v, 10);
+      if (!Number.isNaN(n)) setRun(debugSetResource(r, u.id, rid, n));
+    }
+    if (action === 'effekt') {
+      const id = await pick('effekte', 'Welcher Effekt?');
+      if (id) setRun(debugGiveEffect(r, u.id, id));
+    }
+    if (action === 'effekt-weg') {
+      const id = await dialog.menu({ title: 'Welcher Effekt?', items: (u.effects ?? []).map((e) => ({ label: titleOf(defs, e.effectId), value: e.instanceId })) });
+      if (id) setRun(debugRemoveEffect(r, u.id, id));
+    }
+    if (action === 'versetzen') {
+      setDebugTap({ kind: 'versetzen', unitId: u.id });
+      setMessage('Zielfeld antippen');
+    }
+    if (action === 'entfernen') {
+      setInfoId(null);
+      setRun(debugRemoveUnit(r, u.id));
+    }
   }
 
   // ---------- Darstellung ----------
@@ -340,7 +434,9 @@ export function GameScreen({ id }: { id: string }) {
           back={routes.start()}
           actions={
             <>
-              <button className="icon-btn" aria-label="Log" onClick={() => setShowLog(!showLog)}>📜</button>
+              <button className="icon-btn" aria-label="Protokoll" onClick={() => setShowLog(!showLog)}>📜</button>
+              <button className="icon-btn" aria-label="Statistik" onClick={() => setShowStats(true)}>📊</button>
+              <button className="icon-btn" aria-label="Debug" disabled={aiBusy || battle.phase !== 'kampf'} onClick={debugMenu}>🛠</button>
               <button
                 className="icon-btn"
                 aria-label="Zug zurück"
@@ -433,18 +529,24 @@ export function GameScreen({ id }: { id: string }) {
             {!allyTurn && <button className="btn btn-small" onClick={() => setFast(!fast)}>{fast ? 'Normales Tempo' : 'Überspringen ⏩'}</button>}
           </>
         )}
-        {info && <UnitInfo unit={info} run={r} onClose={() => setInfoId(null)} />}
+        {debugTap && (
+          <p className="small">
+            🛠 Feld antippen … <button className="btn btn-small" onClick={() => setDebugTap(null)}>Abbrechen</button>
+          </p>
+        )}
+        {info && (
+          <UnitInfo
+            unit={info}
+            run={r}
+            onClose={() => setInfoId(null)}
+            onDebug={battle.phase === 'kampf' && !aiBusy && !r.result ? () => debugUnit(info) : undefined}
+          />
+        )}
       </div>
 
-      {showLog && (
-        <div className="game-log" onClick={() => setShowLog(false)}>
-          <div className="game-log-inner" onClick={(e) => e.stopPropagation()}>
-            <h2>Kampf-Log</h2>
-            <ol>{[...r.log].reverse().slice(0, 300).map((l, i) => <li key={i}>{l}</li>)}</ol>
-            <button className="btn" onClick={() => setShowLog(false)}>Schließen</button>
-          </div>
-        </div>
-      )}
+      {showLog && <LogView log={r.log} onClose={() => setShowLog(false)} />}
+
+      {showStats && <StatsView levels={r.stats ?? []} defs={defs} onClose={() => setShowStats(false)} />}
 
       {r.result && (
         <div className="sheet-backdrop">
@@ -505,16 +607,25 @@ function FacingRow({ value, onChange }: { value: Facing; onChange: (f: Facing) =
   );
 }
 
-function UnitInfo({ unit: u, run, onClose }: { unit: Unit; run: RunState; onClose: () => void }) {
+function UnitInfo({ unit: u, run, onClose, onDebug }: { unit: Unit; run: RunState; onClose: () => void; onDebug?: () => void }) {
   const defs = run.defs;
+  // Was der Gegner vorhat (zum Prüfen der KI-Regeln).
+  const intent = u.side === 'enemy' && run.battle.phase === 'kampf' ? aiIntent(toCtx(run), u.id) : null;
+  const target = intent?.targetId ? getUnit(run.battle, intent.targetId) : undefined;
   const shown = Object.keys(u.values ?? {}).filter((k) => defs.resources[k]?.display.show);
   return (
     <div className="unit-info">
       <div className="unit-info-head">
         <strong>{u.name}</strong>
         {u.status === 'bewusstlos' && <span className="muted small"> · bewusstlos</span>}
+        {onDebug && <button className="icon-btn" aria-label="Debug" onClick={onDebug}>🛠</button>}
         <button className="icon-btn" aria-label="Schließen" onClick={onClose}>✕</button>
       </div>
+      {intent && (
+        <p className="small intent">
+          🎯 Hauptziel: <strong>{target?.name ?? 'keins'}</strong> · als Nächstes: <strong>{intent.abilityId ? titleOf(defs, intent.abilityId) : 'nichts'}</strong>
+        </p>
+      )}
       {shown.map((k) => {
         const v = valueOf(defs, u, k) ?? 0;
         const max = u.maxValues?.[k];
@@ -541,6 +652,27 @@ function UnitInfo({ unit: u, run, onClose }: { unit: Unit; run: RunState; onClos
       {run.battle.units.filter((x) => x.carriedBy === u.id && x.status !== 'entfernt').map((x) => (
         <p key={x.id} className="small muted">Trägt {x.name}</p>
       ))}
+    </div>
+  );
+}
+
+/** Protokoll in zeitlicher Reihenfolge; öffnet am Ende (neueste Einträge). */
+function LogView({ log, onClose }: { log: string[]; onClose: () => void }) {
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = list.current.scrollHeight;
+  }, []);
+  return (
+    <div className="game-log" onClick={onClose}>
+      <div className="game-log-inner" onClick={(e) => e.stopPropagation()}>
+        <h2>Protokoll</h2>
+        <ol ref={list} className="log-list">
+          {log.map((l, i) => (
+            <li key={i} className={l.startsWith('▶') ? 'log-turn' : l.startsWith('🛠') ? 'log-debug' : l.startsWith('—') || l.startsWith('Runde') ? 'log-head' : ''}>{l}</li>
+          ))}
+        </ol>
+        <button className="btn" onClick={onClose}>Schließen</button>
+      </div>
     </div>
   );
 }

@@ -287,7 +287,8 @@ export function moveAlong(ctx: Ctx, unitId: string, path: Pos[]): Ctx {
   }
   const facing = facingFromStep(from, to, facingOf(u));
   ctx = setUnits(ctx, (x) => (x.id === unitId ? { ...x, pos: to, facing } : x.carriedBy === unitId ? { ...x, pos: to } : x));
-  ctx = log(ctx, `${u.name} bewegt sich${extra.length ? ` und rutscht ${extra.length} Feld${extra.length === 1 ? '' : 'er'} weiter` : ''}.`);
+  const n = path.length;
+  ctx = log(ctx, `${u.name} bewegt sich ${n} Feld${n === 1 ? '' : 'er'}${extra.length ? ` und rutscht ${extra.length} Feld${extra.length === 1 ? '' : 'er'} weiter` : ''}.`);
   // Ereignisse Feld für Feld (für Bereichs- und Gelände-Auslöser).
   const steps = [...path, ...extra];
   let prev = start;
@@ -646,6 +647,8 @@ function runAbility(
   const hit = resolveHits(ctx, caster, a, chosen, opts.reaction);
   if (!hit) return log(ctx, `${a.title} wird von einem Hindernis aufgehalten.`);
   const source: Source = { unitId: caster.id, side: caster.side, typeIds: a.typeIds, kind: 'faehigkeit' };
+  const outerCause = ctx.cause;
+  ctx = { ...ctx, cause: caster.id };
   const protectedIds = new Set<string>();
   for (const u of hit.units) {
     if (u.id === caster.id) continue;
@@ -663,9 +666,9 @@ function runAbility(
     const fresh = { ...hit, units: hit.units.filter((u) => !protectedIds.has(u.id)).map((u) => getUnit(ctx.battle, u.id)!).filter((u) => u && u.status !== 'entfernt') };
     ctx = applyBlock(ctx, getUnit(ctx.battle, caster.id) ?? caster, abilityId, a, b, fresh, chosen, opts);
   }
-  ctx = emit(ctx, { kind: 'used', casterId: caster.id, abilityId, typeIds: a.typeIds, targetIds: hit.units.map((u) => u.id) });
+  ctx = emit(ctx, { kind: 'used', casterId: caster.id, abilityId, typeIds: a.typeIds, targetIds: hit.units.map((u) => u.id), reaction: !!opts.reaction });
   if (!hit.units.length && !hit.tiles.length && a.blocks.length) ctx = log(ctx, `${a.title} trifft nichts.`);
-  return ctx;
+  return { ...ctx, cause: outerCause };
 }
 
 /**

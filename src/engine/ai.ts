@@ -142,6 +142,33 @@ function ruleTargets(ctx: Ctx, u: Unit, opt: Option, target: RuleTarget, main: U
  * (dann endet der Zug).
  */
 export function aiStep(ctx: Ctx): Ctx | null {
+  const d = decide(ctx);
+  if (!d?.choice) return null;
+  const { opt, targets } = d.choice;
+  let next: Ctx = { ...d.ctx, battle: useAction(d.ctx.battle, opt.action, opt.abilityId) };
+  next = executeAbility(next, d.selfId, opt.abilityId, targets);
+  const moved = getUnit(next.battle, d.selfId);
+  return moved ? advancePatrol(next, moved) : next;
+}
+
+interface Decision {
+  ctx: Ctx;
+  selfId: string;
+  mainId?: string;
+  choice?: { opt: Option; targets: Pos[] };
+}
+
+/** Absicht eines Gegners (für die Anzeige): Hauptziel und die Fähigkeit, die er als Nächstes einsetzen würde. */
+export function aiIntent(ctx: Ctx, unitId: string): { targetId?: string; abilityId?: string } | null {
+  const u = getUnit(ctx.battle, unitId);
+  if (!u?.pos || u.status !== 'aktiv') return null;
+  const own = ctx.battle.turn?.unitId === unitId;
+  const battle = own ? ctx.battle : { ...ctx.battle, turn: { unitId, used: {} } };
+  const d = decide({ ...ctx, battle } as Ctx);
+  return d ? { targetId: d.mainId, abilityId: d.choice?.opt.abilityId } : null;
+}
+
+function decide(ctx: Ctx): Decision | null {
   const u = currentUnit(ctx.battle);
   if (!u?.pos || !aiControlled(ctx, u)) return null;
   const fx = u.effects ?? [];
@@ -171,18 +198,14 @@ export function aiStep(ctx: Ctx): Ctx | null {
   const keep = override?.distance ?? behavior.keepDistance.distance;
   const goal = main?.pos ?? idleGoal(ctx, self, behavior);
 
-  const run = (opt: Option, targets: Pos[]) => {
-    let next: Ctx = { ...ctx, battle: useAction(ctx.battle, opt.action, opt.abilityId) };
-    next = executeAbility(next, self.id, opt.abilityId, targets);
-    const moved = getUnit(next.battle, self.id);
-    return moved ? advancePatrol(next, moved) : next;
-  };
+  const base: Decision = { ctx, selfId: self.id, mainId: main?.id };
+  const run = (opt: Option, targets: Pos[]): Decision => ({ ...base, choice: { opt, targets } });
 
   // Mit Verhaltens-Effekt: nur bewegen (z. B. Flucht).
   if (override) {
     const mv = opts.find((o) => isMovement(o.def));
     const tile = mv ? moveTile(ctx, self, mv, goal, mode, keep) : null;
-    return mv && tile ? run(mv, [tile]) : null;
+    return mv && tile ? run(mv, [tile]) : base;
   }
 
   // Regeln von oben nach unten.
@@ -198,7 +221,7 @@ export function aiStep(ctx: Ctx): Ctx | null {
     if (targets === null || !ruleConditions(ctx, self, rule.conditions, main, targets, opt)) continue;
     return run(opt, targets);
   }
-  if (behavior.rules.length) return null;
+  if (behavior.rules.length) return base;
 
   // Standardverhalten ohne Regeln: Hauptziel angreifen, sonst darauf zu bewegen.
   for (const opt of opts.filter((o) => !isMovement(o.def))) {
@@ -207,7 +230,7 @@ export function aiStep(ctx: Ctx): Ctx | null {
   }
   const mv = opts.find((o) => isMovement(o.def));
   const tile = mv ? moveTile(ctx, self, mv, goal, mode, keep) : null;
-  return mv && tile ? run(mv, [tile]) : null;
+  return mv && tile ? run(mv, [tile]) : base;
 }
 
 function ruleConditions(ctx: Ctx, u: Unit, conds: RuleCondition[], main: Unit | undefined, targets: Pos[], opt: Option): boolean {

@@ -450,7 +450,7 @@ p { margin: 0 0 1em; line-height: 1.5; }
 
 .game-log { position: fixed; inset: 0; z-index: 9; background: #0008; display: flex; align-items: flex-end; }
 .game-log-inner {
-  width: 100%; max-width: 560px; margin: 0 auto; max-height: 70vh; display: flex; flex-direction: column; gap: 8px;
+  width: 100%; max-width: 560px; margin: 0 auto; max-height: 70vh; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
   padding: 16px var(--gap) calc(env(safe-area-inset-bottom) + 16px); background: var(--surface); border-radius: 18px 18px 0 0;
 }
 .game-log-inner ol { margin: 0; padding-left: 1.2em; overflow-y: auto; font-size: .85rem; line-height: 1.45; }
@@ -468,3 +468,16 @@ p { margin: 0 0 1em; line-height: 1.5; }
 /* Startbildschirm: Weiterspielen */
 .continue-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .continue-sub { font-size: .8rem; font-weight: 400; opacity: .8; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Statistik */
+.stats-side h3 { margin: 14px 0 6px; }
+.stats-unit { margin-bottom: 6px; gap: 4px; }
+.stats-head { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit; }
+.stats-head:disabled { cursor: default; opacity: 1; }
+.stats-row { display: flex; flex-direction: column; gap: 1px; }
+.intent { margin: 4px 0; }
+.log-list { list-style: none; padding-left: 0 !important; min-height: 0; flex: 1 1 auto; }
+.log-list li { padding: 1px 0; }
+.log-list .log-turn { margin-top: 6px; font-weight: 600; color: var(--accent, #e0a83a); }
+.log-list .log-head { margin-top: 8px; font-weight: 700; }
+.log-list .log-debug { color: #9fc3e0; }

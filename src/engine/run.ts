@@ -14,6 +14,7 @@ import { posKey } from './grid';
 import { isVictory, terrainAt } from './level';
 import { INITIATIVE_ID } from './resources';
 import { refreshDerived, tickGlobals, tickUnit, type Ctx } from './status';
+import { emptyStats, recordTurn, type LevelStats } from './stats';
 import { aiStep } from './ai';
 import type { PendingReaction } from './events';
 import { executeAbility, type ExecOptions } from './execute';
@@ -27,6 +28,7 @@ export interface Snapshot {
   battle: BattleState;
   globals: Record<string, number>;
   logLength: number;
+  stats?: LevelStats[];
 }
 
 export interface RunState {
@@ -63,6 +65,8 @@ export interface RunState {
   interlude?: InterludeState;
   /** Spiel-Konfiguration vom Start (für „Vorlagen aktualisieren“). */
   game?: GameFields;
+  /** Statistik je gespieltem Level. */
+  stats?: LevelStats[];
 }
 
 const MAX_HISTORY = 60;
@@ -191,7 +195,8 @@ function setupLevel(run: RunState): RunState {
     previous: run.placement,
   });
   battle = { ...battle, terrain, objects, revealed: [] };
-  const next: RunState = { ...run, levelId, battle, result: undefined, choices: undefined, log: [...run.log, `— ${l.title} —`] };
+  const stats = [...(run.stats ?? []), { levelId, title: l.title, stats: emptyStats() }];
+  const next: RunState = { ...run, levelId, battle, stats, result: undefined, choices: undefined, log: [...run.log, `— ${l.title} —`] };
   return { ...next, history: [snapshot(next)], levelStart: snapshot(next) };
 }
 
@@ -258,12 +263,15 @@ function applyStartEffect(ctx: Ctx, unitId: string, effectId: string, duration: 
 
 // ---------- Ablauf ----------
 
-export const toCtx = (run: RunState): Ctx => ({ defs: run.defs, battle: run.battle, globals: run.globals, log: run.log, pending: run.pending ?? [] });
+export const toCtx = (run: RunState): Ctx => ({
+  defs: run.defs, battle: run.battle, globals: run.globals, log: run.log, pending: run.pending ?? [], stats: run.stats?.at(-1)?.stats ?? emptyStats(),
+});
 
 /** Übernimmt einen veränderten Kontext und prüft Sieg/Niederlage. */
 export function fromCtx(run: RunState, ctx: Ctx): RunState {
   if (run.battle.phase === 'kampf') ctx = processEvents(ctx);
-  let next: RunState = { ...run, battle: ctx.battle, globals: ctx.globals, log: ctx.log, pending: ctx.pending ?? [] };
+  const stats = run.stats?.length && ctx.stats ? [...run.stats.slice(0, -1), { ...run.stats[run.stats.length - 1], stats: ctx.stats }] : run.stats;
+  let next: RunState = { ...run, battle: ctx.battle, globals: ctx.globals, log: ctx.log, pending: ctx.pending ?? [], stats };
   next = { ...next, battle: checkOutcome(refreshMap(next)) };
   if (ctx.result === 'niederlage' || next.battle.phase === 'niederlage') {
     return { ...next, result: 'run-verloren', log: [...next.log, `Run verloren${next.battle.outcome ? `: ${next.battle.outcome}` : '.'}`] };
@@ -276,6 +284,10 @@ export function fromCtx(run: RunState, ctx: Ctx): RunState {
 /** Zeitpunkt für alle bzw. einen Charakter und die globalen Ressourcen. */
 function tick(ctx: Ctx, event: TickEvent, unitId?: string): Ctx {
   if (unitId) {
+    if (event.unit === 'zug' && event.timing === 'beginn') {
+      const u = ctx.battle.units.find((x) => x.id === unitId);
+      ctx = { ...ctx, log: [...ctx.log, `▶ ${u?.name ?? '?'} ist am Zug`], stats: ctx.stats && recordTurn(ctx.stats, ctx.battle, unitId) };
+    }
     ctx = tickUnit(ctx, unitId, event);
     return event.unit === 'zug' ? turnWorkings(ctx, unitId, event.timing) : ctx;
   }
@@ -321,7 +333,7 @@ export function finishTurn(run: RunState): RunState {
 }
 
 function snapshot(run: RunState): Snapshot {
-  return { battle: run.battle, globals: run.globals, logLength: run.log.length };
+  return { battle: run.battle, globals: run.globals, logLength: run.log.length, stats: run.stats };
 }
 
 function recordIfAllyTurn(run: RunState): RunState {
@@ -342,7 +354,10 @@ export function undo(run: RunState): RunState {
     history = h.slice(0, -1);
     target = history[history.length - 1];
   }
-  return { ...run, battle: target.battle, globals: target.globals, log: [...run.log.slice(0, target.logLength), '↶ Zug zurückgenommen'], history, result: undefined, choices: undefined };
+  return {
+    ...run, battle: target.battle, globals: target.globals, stats: target.stats ?? run.stats,
+    log: [...run.log.slice(0, target.logLength), '↶ Zug zurückgenommen'], history, result: undefined, choices: undefined, pending: [],
+  };
 }
 
 export const canUndo = (run: RunState) => run.history.length > 1 || (run.history.length === 1 && changedSince(run, run.history[0]));
@@ -365,7 +380,7 @@ function carryTeam(run: RunState): TeamState[] {
   });
 }
 
-function finishLevel(run: RunState): RunState {
+export function finishLevel(run: RunState): RunState {
   let ctx = tick(toCtx(run), { unit: 'level', timing: 'ende' });
   const done = { ...run, battle: ctx.battle, globals: ctx.globals, log: [...ctx.log, 'Level geschafft!'] };
   const c = run.content;
@@ -407,7 +422,7 @@ export function nextLevel(run: RunState, stationId?: string): RunState {
 export function restartLevel(run: RunState): RunState {
   const first = run.levelStart;
   if (!first) return run;
-  return { ...run, battle: first.battle, globals: first.globals, log: [...run.log.slice(0, first.logLength), '↺ Level neu gestartet'], history: [first], result: undefined, choices: undefined };
+  return { ...run, battle: first.battle, globals: first.globals, stats: first.stats ?? run.stats, pending: [], log: [...run.log.slice(0, first.logLength), '↺ Level neu gestartet'], history: [first], result: undefined, choices: undefined };
 }
 
 /** Ist ein vom Spieler gesteuerter Ally am Zug? (Allys mit Verhaltens-Effekt steuert die KI.) */

@@ -184,3 +184,45 @@ describe('Spielablauf', () => {
     expect(runSummary(next)).toEqual({ dungeon: null, level: 'Gang', status: 'Runde 1', allys: ['Paladin'] });
   });
 });
+
+describe('Statistik & Debug', () => {
+  it('zählt Züge, Felder, Fähigkeiten und gesenkte Ressourcen; Undo setzt zurück', async () => {
+    const { mergeStats, sideTotal } = await import('./stats');
+    let run = beginCombat(createRun(game, makeDefs()));
+    run = act(run, 'laufen', [{ x: 1, y: 5 }]);
+    run = act(run, 'schlag', [{ x: 2, y: 5 }]);
+    const st = run.stats!.at(-1)!.stats;
+    const r = st.units.m1;
+    expect(r.turns).toBe(1);
+    expect(r.moved).toBe(1);
+    expect(r.abilities).toEqual({ laufen: 1, schlag: 1 });
+    expect(r.lowered).toEqual({ lp: 4 });
+    expect(sideTotal(st, 'ally').lowered).toEqual({ lp: 4 });
+    expect(mergeStats([st, st]).units.m1.lowered).toEqual({ lp: 8 });
+    expect(run.log).toContain('▶ Ritter ist am Zug');
+    run = undo(run);
+    expect(run.stats!.at(-1)!.stats.units.m1.abilities).toEqual({});
+  });
+
+  it('Debug: Ressource setzen, Gegner hinzufügen, Level gewinnen – zählt nicht in der Statistik', async () => {
+    const { debugAddEnemy, debugSetResource, debugWinLevel } = await import('./debug');
+    let run = beginCombat(createRun(game, makeDefs()));
+    run = debugSetResource(run, 'g1', 'lp', 1);
+    expect(getUnit(run.battle, 'g1')!.values!.lp).toBe(1);
+    expect(run.log.some((l) => l.startsWith('🛠'))).toBe(true);
+    run = debugAddEnemy(run, 'goblin', { x: 5, y: 5 });
+    expect(run.battle.units.filter((u) => u.side === 'enemy' && u.status !== 'entfernt')).toHaveLength(2);
+    expect(run.stats!.at(-1)!.stats.units.m1?.lowered ?? {}).toEqual({});
+    run = debugWinLevel(run);
+    expect(run.result).toBe('level-gewonnen');
+  });
+
+  it('KI-Absicht: Hauptziel und nächste Fähigkeit', async () => {
+    const { aiIntent } = await import('./ai');
+    const defs = makeDefs();
+    defs.enemies.goblin = { ...defs.enemies.goblin, sightArea: ['0,0', '-1,1', '0,1', '1,1'], actions: [{ name: 'Angriff', abilities: [{ abilityId: 'schlag', maxUses: 1 }] }] };
+    defs.enemies.goblin.resources = [...defs.enemies.goblin.resources, { ...newCharacterResource('mana'), start: 5, max: 5 }];
+    const run = beginCombat(createRun(game, defs));
+    expect(aiIntent(toCtx(run), 'g1')).toEqual({ targetId: 'm1', abilityId: 'schlag' });
+  });
+});

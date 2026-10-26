@@ -87,7 +87,7 @@ Die Reihenfolge ist so gewählt, dass zuerst die Grundlagen (Technik, Regeln, Gr
 | 12 | Neues Spiel (Setup) | ✅ |
 | 13 | Spielmodus (Kampf-Oberfläche) | ✅ |
 | 14 | Speichern & Laden | ✅ |
-| 15 | Balancing-Werkzeuge | ⬜ |
+| 15 | Balancing-Werkzeuge | ✅ |
 | 16 | Import / Export & Datenaustausch | ⬜ |
 
 ---
@@ -551,7 +551,7 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - **Antippen einer Figur** zeigt Ressourcen-Balken, Effekte und Rucksack.
 - **Nebel:** nie gesehen = schwarz, erkundet = abgedunkelt (ohne Gegner), sichtbar = normal.
 - **Zug zurück** (↶) jederzeit; zurück an den Beginn des eigenen Zuges bzw. des vorherigen.
-- **Kampf-Log** (📜) mit allen Veränderungen.
+- **Protokoll** (📜) mit allen Veränderungen, **Statistik** (📊) und **Debug** (🛠) – siehe Abschnitt 15.
 - **Ende:** Run verloren → Zug zurück / Level neu starten / Menü · Level geschafft → Weiter (bei Verzweigung Auswahl) · Run gewonnen → Zug zurück / Level noch einmal / Menü.
 - **Reaktionen:** erscheinen als Ring (⚡) am reagierenden Ally, die Kamera springt hin; mit ✕ überspringen (verbraucht die Reaktion nicht); bei Zwang-Fähigkeiten direkt die Zielwahl. Solange eine Reaktion offen ist, wartet die KI. Gegner reagieren nur über Regeln mit „Als Reaktion“.
 - **Gegenstände:** Passen bei „Objekt verwenden/geben/werfen“ bzw. „Platzieren aus dem Rucksack“ mehrere Gegenstände, wird gefragt, welcher.
@@ -595,14 +595,28 @@ Objekte haben **keine** eigenen Ressourcen und **keinen** Inhalt (keine Behälte
 - `src/engine/run.ts` – `refreshTemplates`, `runSummary` (mit Tests)
 - `src/screens/editors/SaveEditor.tsx`, `src/screens/StartScreen.tsx`, `src/screens/ListScreen.tsx`
 
-### 15 – Balancing-Werkzeuge *(optional)*
+### 15 – Balancing-Werkzeuge
 **Ziel:** Das Austesten und Auswerten erleichtern.
-- Statistiken pro Kampf (Schaden, Heilung, Rundenzahl)
-- Werte während des Spiels live anpassen („Cheat-/Debug-Menü“)
-- Rückgängig/Zug wiederholen
-- ggf. automatische Simulation vieler Kämpfe
 
-**Offene Punkte / Entscheidungen:** –
+**Festgelegt:**
+- **Protokoll** (📜, jederzeit): schreibt in zeitlicher Reihenfolge mit, was passiert – Level, Runden, wessen Zug (▶), Bewegungen (mit Feldern), eingesetzte Fähigkeiten und Reaktionen, Ressourcen-Änderungen, Effekte, gesammelte/verwendete Gegenstände, Debug-Eingriffe (🛠). Öffnet am Ende (neueste Einträge).
+- **Statistik** (📊, jederzeit) für **dieses Level** oder den **ganzen Run**, je Seite (Allys / Gegner) als Summe und je Figur:
+  - Ressourcen-Punkte **bei der Gegenseite gesenkt** (je Ressource)
+  - Ressourcen-Punkte **bei der eigenen Seite aufgefüllt** (je Ressource, inkl. sich selbst)
+  - **Effekte vergeben** (je Effekt), **Fähigkeiten eingesetzt**, **Reaktionen** (je Fähigkeit)
+  - **Gegenstände eingesammelt** und **verwendet**
+  - zusätzlich: **Züge**, **bewegte Felder**, **wie oft bewusstlos**
+  - Gezählt wird, was eine Figur selbst bewirkt hat; Umgebung (Gelände, Objekte, automatische Änderungen) und Debug zählen nicht. Kein gesonderter „Schaden“. „Zug zurück“ setzt auch die Statistik zurück.
+- **Debug-Menü** (🛠, nicht während KI-Zügen; alles im Protokoll markiert):
+  - allgemein: Nebel aus/an · Gegner hinzufügen · Objekt hinzufügen · Objekte auf einem Feld entfernen · Level sofort gewinnen
+  - an einer Figur (Figur antippen → 🛠): Ressource setzen · Effekt geben · Effekt entfernen · Versetzen · Entfernen
+- **Absicht der Gegner:** Beim Antippen eines Gegners: aktuelles Hauptziel und die Fähigkeit, die er als Nächstes einsetzen würde.
+- **Nicht umgesetzt (so entschieden):** „Zug wiederholen“, automatische Simulation.
+
+**Umsetzung:**
+- `src/engine/stats.ts` – Statistik aus den Ereignissen (Verursacher an Ressourcen- und Effekt-Ereignissen)
+- `src/engine/debug.ts` – Debug-Eingriffe; `aiIntent` in `src/engine/ai.ts` (mit Tests)
+- `src/screens/game/StatsView.tsx`, Protokoll und Debug in `src/screens/game/GameScreen.tsx`
 
 ### 16 – Import / Export & Datenaustausch *(optional)*
 **Ziel:** Inhalte sichern, teilen und ins PC-Game übernehmen.

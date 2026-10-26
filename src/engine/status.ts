@@ -1,4 +1,5 @@
 // Laufzeit: Ressourcen, Events und Effekte während eines Kampfes.
+import type { Stats } from './stats';
 import { getUnit, removeUnit, setSkipsTurns, setUnconscious, type BattleState, type Unit } from './battle';
 export type { Source } from './events';
 import type { Defs } from './defs';
@@ -19,6 +20,10 @@ export interface Ctx {
   events?: GameEvent[];
   /** Ausgelöste Reaktionen von Allys, die auf eine Entscheidung warten. */
   pending?: PendingReaction[];
+  /** Wer gerade handelt (Fähigkeit) – Verursacher für die Statistik. */
+  cause?: string;
+  /** Statistik des laufenden Levels. */
+  stats?: Stats;
 }
 
 export const emit = (ctx: Ctx, e: GameEvent): Ctx => ({ ...ctx, events: [...(ctx.events ?? []), e] });
@@ -88,8 +93,8 @@ export function changeResource(ctx: Ctx, unitId: string, resourceId: string, amo
   const mod = before - u.values[resourceId];
   const after = applyChange(before, amount, maxOf(u, resourceId), mayExceedMax);
   ctx = setUnit(ctx, unitId, { values: { ...u.values, [resourceId]: after - mod } });
-  ctx = log(ctx, `${u.name}: ${titleOf(ctx.defs, resourceId)} ${before} → ${after}`);
-  if (before !== after) ctx = emit(ctx, { kind: 'resource', unitId, resourceId, before, after });
+  if (before !== after) ctx = log(ctx, `${u.name}: ${titleOf(ctx.defs, resourceId)} ${before} → ${after}`);
+  if (before !== after) ctx = emit(ctx, { kind: 'resource', unitId, resourceId, before, after, causeId: source?.unitId ?? ctx.cause });
   return resourceEvents(ctx, unitId, resourceId, before, after, depth);
 }
 
@@ -267,6 +272,7 @@ export function giveEffect(
   if (!r.added) return log(ctx, `${def.title} wirkt nicht auf ${u.name}.`);
   const before = snapshotValues(ctx, u);
   ctx = setUnit(ctx, unitId, { effects: r.active });
+  ctx = emit(ctx, { kind: 'effect', unitId, effectId, causeId: sourceId ?? ctx.cause });
   ctx = log(ctx, `${u.name} erhält ${def.title}${r.ended.length ? ` (beendet: ${r.ended.map((e) => titleOf(ctx.defs, e.effectId)).join(', ')})` : ''}.`);
   return afterEffectChange(refreshDerived(ctx, unitId), unitId, before, depth);
 }
